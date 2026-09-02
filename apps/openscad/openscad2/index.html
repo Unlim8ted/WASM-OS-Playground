@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CAD Script Editor</title>
+    <meta name="description" content="Local CAD script editor workspace.">
+
+    <link rel="icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="logo192.png">
+    <!-- Web app manifest. -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+
+    <link rel="prefetch" href="openscad.wasm">
+    <link rel="prefetch" href="openscad-worker.js">
+    <link rel="prefetch" href="libraries/fonts.zip">
+
+    <link rel="prefetch" href="libraries/MCAD.zip">
+    <link rel="prefetch" href="libraries/BOSL2.zip">
+    <link rel="prefetch" href="libraries/BOSL.zip">
+    <link rel="prefetch" href="libraries/NopSCADlib.zip">
+    <link rel="prefetch" href="libraries/FunctionalOpenSCAD.zip">
+    <link rel="prefetch" href="libraries/funcutils.zip">
+    <link rel="prefetch" href="libraries/smooth-prim.zip">
+    <link rel="prefetch" href="libraries/closepoints.zip">
+    <link rel="prefetch" href="libraries/plot-function.zip">
+    <link rel="prefetch" href="libraries/YAPP_Box.zip">
+    <link rel="prefetch" href="libraries/Stemfie_OpenSCAD.zip">
+    <link rel="prefetch" href="libraries/UB.scad.zip">
+    <link rel="prefetch" href="libraries/openscad-tray.zip">
+
+    <!-- Local model viewer. -->
+    <script type="module" src="./model-viewer.min.js" defer></script>
+    
+    <!-- Local BrowserFS. -->
+    <script src="./browserfs.min.js" defer></script>
+
+    <script src="./index.js" defer></script>
+
+    <!-- Local ribbon stylesheet retained for upstream CSS compatibility. -->
+    <link rel="stylesheet" href="./gh-fork-ribbon.min.css">
+
+    <style>
+      .source-ribbon,
+      a[href^="http"] {
+        display: none !important;
+      }
+
+      #root,
+      body,
+      html {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        margin: 0;
+
+        height: 100vh;
+        height: var(--app-height);
+      }
+
+      .p-tabmenu-nav {
+        justify-content: center;
+      }
+
+      .p-fieldset .p-fieldset-content {
+        padding: 0 !important;
+      }
+      .p-fieldset-legend {
+        background-color: rgba(255,255,255,0.4) !important;
+      }
+
+      .p-fieldset-legend,
+      .p-fieldset-content {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+      }
+
+      .absolute-fill {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        bottom: 0;
+      }
+
+      .monaco-editor,
+      .openscad-editor {
+        background-color: rgba(255,255,255,0.5) !important;
+      }
+      textarea.openscad-editor {
+        font-family: "Droid Sans Mono", "monospace", monospace;
+        font-weight: normal;
+        font-size: 16px;
+        font-feature-settings: "liga" 0, "calt" 0;
+        line-height: 22px;
+        letter-spacing: 0px;
+      }
+      .overflow-guard,
+      .monaco-scrollable-element,
+      .monaco-editor-background {
+        background-color: transparent !important;
+      }
+
+      .opacity-animated {
+        transition: opacity 0.5s ease-in-out;
+      }
+      .opacity-0 {
+        opacity: 0;
+      }
+
+      @media only screen and (max-height: 600px),
+           only screen and (max-width: 600px),
+           only screen and (max-width: 767px),
+           only screen and (max-aspect-ratio: 1/2) {
+        .source-ribbon {
+          display: none;
+        }
+      }
+
+      .p-tabmenu-nav {
+        padding-right: 30px;
+      }
+
+      .source-ribbon:before { background-color: #333; }
+    </style>
+    <script>
+      addEventListener('click', function (event) {
+        var link = event.target && event.target.closest && event.target.closest('a[href^="http"]');
+        if (link) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
+      window.open = function () { return null; };
+    </script>
+  </head>
+  <body>
+    <audio id="complete-sound">
+      <source src="complete.wav" type="audio/wav">
+      Your browser does not support the audio element.
+    </audio>
+    <a target="_blank" class="source-ribbon"
+       href="#"
+       data-ribbon=""
+       title="">
+    </a>
+
+    <noscript>You need to enable JavaScript to run the OpenSCAD Playground.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
