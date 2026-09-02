@@ -1,0 +1,2738 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>FreeCAD in your browser - the full CAD app compiled to WebAssembly</title><link rel="icon" href="./icon-192.png">
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- Copyright (c) Virtastic -->
+<meta name="description" content="Run FreeCAD in your browser - the real parametric CAD application, with its Qt interface, the OpenCASCADE kernel and Python, compiled to WebAssembly. No install, nothing uploaded.">
+<!-- Canonical: nginx serves this file for the bare root, so / is the only URL that should ever
+     rank. /freecad-gui.html reaches the same page directly and folds into it here. -->
+<link rel="canonical" href="https://freecad.virtastic.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Virtastic">
+<meta property="og:title" content="FreeCAD in your browser">
+<meta property="og:description" content="The full parametric CAD app - Qt GUI, OpenCASCADE kernel and Python - compiled to WebAssembly. Runs at freecad.virtastic.app with nothing to install.">
+<meta property="og:url" content="https://freecad.virtastic.app/">
+<meta property="og:image" content="https://freecad.virtastic.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FreeCAD in your browser - the full parametric CAD app compiled to WebAssembly, at freecad.virtastic.app">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="FreeCAD in your browser">
+<meta name="twitter:description" content="The full parametric CAD app - Qt GUI, OpenCASCADE kernel and Python - compiled to WebAssembly. Runs at freecad.virtastic.app.">
+<meta name="twitter:image" content="https://freecad.virtastic.app/og.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication",
+ "name":"FreeCAD in your browser (freecad-web)",
+ "url":"https://freecad.virtastic.app/",
+ "description":"FreeCAD, the open-source parametric 3D CAD modeller, compiled to WebAssembly. The real application - its Qt interface, the OpenCASCADE geometry kernel and an embedded Python stack - running in a browser tab with nothing to install and no drawing leaving the machine.",
+ "image":"https://freecad.virtastic.app/og.png",
+ "applicationCategory":"DesignApplication",
+ "applicationSubCategory":"CAD",
+ "operatingSystem":"Web browser (desktop Chrome/Chromium)",
+ "browserRequirements":"Requires WebAssembly and SharedArrayBuffer. Desktop Chrome or Chromium.",
+ "isAccessibleForFree":true,
+ "offers":{"@type":"Offer","price":"0","priceCurrency":"USD","availability":"https://schema.org/InStock"},
+ "publisher":{"@type":"Organization","name":"Virtastic","url":"https://virtastic.app"},
+ "license":"https://www.gnu.org/licenses/lgpl-2.1.html"}
+</script>
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- Copyright (c) Virtastic -->
+<!-- Build identity. infra/Dockerfile rewrites the placeholder at image build time with the
+     release tag + short SHA. Without this a bug report cannot be tied to a build, which is
+     why it is set here, before anything else, rather than somewhere convenient later. The
+     literal below is what you see when running the page straight from a checkout. -->
+<script>window.FCWEB_BUILD = "build-20260826-fem+87566fa".indexOf("FCWEB_BUILD") >= 0 ? "dev" : "build-20260826-fem+87566fa";
+document.addEventListener('DOMContentLoaded', function(){
+  var el = document.getElementById('buildstamp');
+  if (el) el.textContent = ' · build ' + window.FCWEB_BUILD;
+});
+
+// Anonymous event counters. Until now a failure died in this tab: nothing could answer
+// "what fraction of visitors never reach Ready?" or "how often does the 2 GB heap abort?",
+// and a user hitting a problem was invisible unless they filed an issue.
+//
+// This sends FOUR enumerated events and nothing else. No identifier, no cookie, no document
+// name, no free text, no session id -- there is deliberately nothing here that could
+// identify a person or their work, and the server does not log IPs either. It is a counter,
+// not analytics: it cannot tell you who, only how many.
+//
+// sendBeacon because it survives the page being closed, which is exactly when an abort
+// happens. Every call is wrapped: telemetry must never be able to break the app.
+window.fcwebEvent = function (name, kind, ms) {
+  try {
+    var q = '/t?e=' + encodeURIComponent(name) +
+            '&b=' + encodeURIComponent(window.FCWEB_BUILD || 'unknown');
+    if (kind) { q += '&k=' + encodeURIComponent(String(kind).slice(0, 32)); }
+    if (ms)   { q += '&ms=' + Math.round(ms); }
+    if (navigator.sendBeacon) { navigator.sendBeacon(q); }
+    else { fetch(q, { method: 'POST', keepalive: true }).catch(function () {}); }
+  } catch (e) { /* never let a counter break the page */ }
+};
+window.fcwebEvent('boot_start');
+// Re-attach a previously chosen backup folder as early as possible, so the first autosave
+// mirror has somewhere to go. Never prompts -- a permission prompt the user did not ask for
+// on page load is hostile, and the status line offers a button instead.
+document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(function () {
+    try { window.__fcRestoreBackupDir && window.__fcRestoreBackupDir(); } catch (e) {}
+  }, 3000);
+});</script>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#2b2f36">
+<!-- Without this a tablet renders the canvas at a fake 980px width and then scales it,
+     so the UI is tiny and every hit-test is offset. user-scalable=no because the 3D view
+     does its own pinch-zoom; letting the browser zoom the page too fights it. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<style>
+ html,body{margin:0;height:100%;background:#2b2b2b;color:#ddd;font:13px ui-monospace,Menlo,monospace;overflow:hidden}
+ /* Qt fills the ENTIRE browser window. The boot log is an optional overlay, not
+    a permanent strip, so FreeCAD gets the full viewport. */
+ #screen{position:absolute;inset:0}
+ #screen>canvas{width:100%;height:100%;display:block}
+ #log{position:absolute;left:0;right:0;bottom:0;height:170px;overflow:auto;white-space:pre-wrap;
+      background:rgba(17,17,27,.95);border-top:1px solid #444;padding:6px 8px;color:#a6e3a1;font-size:11px;z-index:10}
+ #log.hidden{display:none}
+ .err{color:#f38ba8} #status{color:#f9e2af}
+ #logtoggle{position:absolute;right:6px;bottom:6px;z-index:11;background:#1e1e2e;color:#8087a2;
+      border:1px solid #45475a;border-radius:4px;padding:1px 7px;font:11px ui-monospace,Menlo,monospace;cursor:pointer;opacity:.45}
+ #logtoggle:hover{opacity:1}
+ /* --- Loading overlay: the Virtastic house style, identical to jk2-web / jka-web /
+    ja2-web / openmw-web. The palette, type, bar geometry and motion below are copied
+    from those projects rather than re-derived, so the four sit side by side without a
+    seam; only the glyph, the title, the seed phrase and the credit line differ. --- */
+ :root{
+   --ash:#0a0a09; --panel:#14100c; --panel-2:#1c1712; --line:#3a2f22;
+   --ink:#ece2c8; --muted:#a2977c; --faint:#786c58;
+   --bronze:#8a7a4e; --bronze-hi:#c7b070; --gold:#c9a54a; --gold-hi:#eccf7e;
+   --ember:#8b1a1a; --err:#e0836a; --ok:#a9c48a;
+ }
+ #load{position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+   padding:24px; text-align:center; background:var(--ash); color:var(--ink);
+   font:16px/1.6 "Optima","Gill Sans","Gill Sans MT",-apple-system,"Segoe UI",Roboto,sans-serif;
+   transition:opacity .6s ease}
+ #load.hide{opacity:0; pointer-events:none}
+ #load::before{content:''; position:absolute; inset:0; pointer-events:none;
+   background:
+     radial-gradient(150% 72% at 50% 132%, rgba(230,140,40,.26), rgba(0,0,0,0) 60%),
+     radial-gradient(90% 60% at 50% 134%, rgba(255,200,110,.12), rgba(0,0,0,0) 56%);
+   animation:ldEmber 9s ease-in-out infinite}
+ @keyframes ldEmber{0%,100%{opacity:.82}50%{opacity:1}}
+ #load .ld-inner{position:relative; width:100%; max-width:460px}
+ #load .ld-glyph{width:56px; height:56px; margin:0 auto 24px; color:var(--bronze-hi);
+   animation:ldSpin 7s linear infinite}
+ #load .ld-glyph svg{width:100%; height:100%; display:block}
+ @keyframes ldSpin{to{transform:rotate(360deg)}}
+ #load .ld-title{margin:0 0 10px;
+   font-family:"Hoefler Text","Baskerville","Palatino Linotype",Palatino,Georgia,serif;
+   font-weight:600; font-size:clamp(26px,5vw,40px); letter-spacing:.01em; color:var(--ink);
+   text-shadow:0 1px 0 rgba(0,0,0,.6), 0 0 34px rgba(201,165,74,.12)}
+ #load .ld-title .accent{color:#c0392b; text-shadow:0 0 20px rgba(192,57,43,.4)}
+ #load .ld-status{margin:0 0 22px; font-size:11.5px; letter-spacing:.22em; text-transform:uppercase;
+   font-weight:600; color:var(--bronze-hi)}
+ #load .ld-bar{position:relative; height:4px; border-radius:3px; overflow:hidden;
+   background:rgba(138,122,78,.28)}
+ #load .ld-fill{height:100%; width:0; border-radius:3px;
+   background:linear-gradient(90deg,var(--bronze),var(--gold),var(--gold-hi));
+   transition:width .3s ease}
+ #load.indet .ld-fill{width:34%; animation:ldSlide 1.25s ease-in-out infinite}
+ @keyframes ldSlide{0%{transform:translateX(-110%)} 100%{transform:translateX(330%)}}
+ #load .ld-detail{margin-top:13px; min-height:16px; font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;
+   color:var(--faint)}
+ #load .ld-lede{margin:22px 0 0; font-size:13.5px; line-height:1.55; color:var(--muted)}
+ #load .ld-credit{margin-top:26px; font-size:11px; letter-spacing:.08em; color:var(--faint)}
+ #load .ld-credit a{color:var(--bronze-hi); text-decoration:none; border-bottom:1px solid var(--line)}
+ #load .ld-credit a:hover{color:var(--gold)}
+ #load.err .ld-glyph{animation:none; color:var(--err)}
+ #load.err .ld-status{color:var(--err)}
+ #load.err .ld-detail{color:var(--err)}
+ #load.err .ld-fill{background:var(--err)}
+ @media (prefers-reduced-motion:reduce){
+   #load::before,#load .ld-glyph{animation:none}
+   #load.indet .ld-fill{animation:none; width:100%}
+ }
+</style></head>
+<body>
+<div id="screen"></div>
+<div id="load" class="indet">
+  <div class="ld-inner">
+    <div class="ld-glyph" aria-hidden="true">
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round">
+        <!-- isometric CAD cube -->
+        <path d="M24 5 41 14.5 41 33.5 24 43 7 33.5 7 14.5Z"/>
+        <path d="M24 5 24 24 41 14.5M24 24 7 14.5M24 24 24 43"/>
+        <circle cx="24" cy="24" r="2.2" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
+    <h1 class="ld-title" id="ld-title">Free<span class="accent">CAD</span></h1>
+    <div class="ld-status" id="ld-status">Preparing the workbench&hellip;</div>
+    <div class="ld-bar"><div class="ld-fill" id="ld-fill"></div></div>
+    <div class="ld-detail" id="ld-detail">first load downloads about 115 MB</div>
+    <!-- Says what this page IS, in prose. Two audiences need it and neither was served before:
+         a visitor staring at a 115 MB download with no explanation, and a crawler, for which
+         this boot panel is the ENTIRE readable page — the app itself is a canvas. -->
+    <p class="ld-lede">FreeCAD, the open-source parametric 3D CAD modeller, compiled to
+      WebAssembly. The real application — its Qt interface, the OpenCASCADE geometry kernel
+      and an embedded Python — running in this tab. Nothing is installed, and no drawing
+      leaves your machine.</p>
+    <div class="ld-credit">freecad-web by
+      <a href="https://virtastic.app" target="_blank" rel="noopener">Virtastic</a>
+      &middot; <a href="./legal.html" target="_blank" rel="noopener">LGPL-2.1</a> &middot;
+      <a href="https://github.com/Virtastic/freecad-web" target="_blank" rel="noopener">Source</a>
+      <span id="buildstamp"></span></div>
+  </div>
+</div>
+<div id="log" class="hidden"><span id="status">loading…</span></div>
+<button id="logtoggle" title="show/hide boot log">log</button>
+<script>
+// Blocking HTML confirm used by the JSPI dialog bridge (_fcwebdlg.confirm ->
+// fcweb_html_confirm EM_ASYNC_JS -> here). Returns a Promise resolving to the
+// clicked button index; the wasm side suspends (JSPI) until then.
+// ---- gmsh bridge ---------------------------------------------------------
+// gmsh is a SEPARATE wasm module (play-gui/gmsh.wasm) with its own filesystem, loaded
+// the first time someone meshes so the 152 MB main binary does not grow. FreeCAD writes
+// the .brep + .geo into ITS FS and calls _fcwebgmsh.run(...), which suspends via JSPI
+// until this resolves; we ferry the bytes across, run the script, and copy the .unv back
+// so Fem.read() on the FreeCAD side finds it exactly where the .geo's Save line put it.
+(function () {
+  var modP = null;                       // cached module promise (load once)
+  function load() {
+    if (modP) { return modP; }
+    modP = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'gmsh.js?v=95f32f922e64';
+      s.onload = function () {
+        if (typeof GmshModule !== 'function') { reject(new Error('gmsh.js did not define GmshModule')); return; }
+        // Carry the ?v= stamp from this script's URL over to gmsh.wasm. infra/Dockerfile
+        // keys that stamp on the WASM's md5, so propagating it content-addresses the wasm
+        // too. Without this the .js gets a fresh URL while the .wasm -- served immutable
+        // for a year -- stays stale in a returning browser, i.e. new loader, old engine.
+        var q = (s.src.split('?')[1] || '');
+        GmshModule(q ? { locateFile: function (f) { return /\.wasm$/.test(f) ? f + '?' + q : f; } } : {})
+          .then(resolve, reject);
+      };
+      s.onerror = function () { reject(new Error('failed to fetch gmsh.js')); };
+      document.head.appendChild(s);
+    });
+    modP.catch(function () { modP = null; });   // let a later attempt retry
+    return modP;
+  }
+  var base = function (p) { return String(p).replace(/^.*\//, ''); };
+
+  window.fcwebGmshRun = async function (geoPath, brepPath, unvPath, verbosity) {
+    var fc = window.fcInstance;
+    if (!fc || !fc.FS) { return 1; }
+    var G;
+    try {
+      if (typeof window.fcwebNotify === 'function' && !modP) {
+        window.fcwebNotify('Loading the mesher…', 'info');
+      }
+      G = await load();
+    } catch (e) {
+      if (typeof window.fcwebNotify === 'function') {
+        window.fcwebNotify('Could not load the mesher: ' + e.message, 'error');
+      }
+      return 1;
+    }
+    try {
+      // gmsh resolves the .geo's Merge/Save paths relative to the script, so keep
+      // everything in one flat working dir inside the gmsh module's FS.
+      var wd = '/work';
+      try { G.FS.mkdir(wd); } catch (e) {}
+      var geoName = base(geoPath), brepName = base(brepPath), unvName = base(unvPath);
+      G.FS.writeFile(wd + '/' + brepName, fc.FS.readFile(brepPath));
+      G.FS.writeFile(wd + '/' + geoName, fc.FS.readFile(geoPath));
+      try { G.FS.chdir(wd); } catch (e) {}
+
+      var rc = G.ccall('fcweb_gmsh_run', 'number', ['string', 'number'],
+                       [wd + '/' + geoName, verbosity | 0]);
+      if (rc !== 0) {
+        if (typeof window.fcwebNotify === 'function') {
+          window.fcwebNotify('Meshing failed (gmsh returned ' + rc + ').', 'error');
+        }
+        return rc;
+      }
+      var out;
+      try { out = G.FS.readFile(wd + '/' + unvName); }
+      catch (e) {
+        if (typeof window.fcwebNotify === 'function') {
+          window.fcwebNotify('The mesher produced no output file.', 'error');
+        }
+        return 1;
+      }
+      fc.FS.writeFile(unvPath, out);      // hand it back where Fem.read() expects it
+      // Don't let one run's files confuse the next.
+      try { G.FS.unlink(wd + '/' + brepName); G.FS.unlink(wd + '/' + geoName); G.FS.unlink(wd + '/' + unvName); } catch (e) {}
+      return 0;
+    } catch (e) {
+      try { console.error('[fcweb] gmsh bridge', e); } catch (_) {}
+      if (typeof window.fcwebNotify === 'function') {
+        window.fcwebNotify('Meshing failed: ' + (e && e.message ? e.message : e), 'error');
+      }
+      return 1;
+    }
+  };
+
+  window.fcwebGmshVersion = async function () {
+    try {
+      var G = await load();
+      return G.ccall('fcweb_gmsh_version', 'string', [], []);
+    } catch (e) { return null; }
+  };
+})();
+
+// ---------------------------------------------------------------------------
+// CalculiX. FreeCAD's FEM solver writes <job>.inp and runs `ccx -i <job>`, then reads
+// back <job>.frd and <job>.dat. ccx is a separate wasm module with its own filesystem,
+// so the files are ferried across here.
+//
+// A FRESH module instance is created per solve, unlike the mesher: ccx keeps state in
+// globals and was written as a one-shot process, so reusing an instance would carry the
+// previous run's state into the next one. The cost is re-instantiating ~4 MB, which is
+// small next to the solve itself.
+(function () {
+  var scriptP = null;
+  var ccxOpts = {};                      // locateFile for ccx.wasm, set once the script URL is known
+
+  function loadScript() {
+    if (scriptP) { return scriptP; }
+    scriptP = new Promise(function (resolve, reject) {
+      if (typeof CcxModule === 'function') { resolve(); return; }
+      var s = document.createElement('script');
+      s.src = 'ccx.js?v=b137cfc4fdd1';
+      s.onload = function () {
+        if (typeof CcxModule !== 'function') { reject(new Error('ccx.js did not define CcxModule')); return; }
+        // Propagate this script's ?v= stamp to ccx.wasm -- see the same note in the gmsh
+        // loader above. The stamp is keyed on the wasm's md5, so without forwarding it a
+        // rebuilt solver stays stale behind a year-long immutable cache.
+        var q = (s.src.split('?')[1] || '');
+        if (q) { ccxOpts = { locateFile: function (f) { return /\.wasm$/.test(f) ? f + '?' + q : f; } }; }
+        resolve();
+      };
+      s.onerror = function () { reject(new Error('failed to fetch ccx.js')); };
+      document.head.appendChild(s);
+    });
+    scriptP.catch(function () { scriptP = null; });   // let a later attempt retry
+    return scriptP;
+  }
+
+  function dirOf(p) { var i = String(p).lastIndexOf('/'); return i < 0 ? '.' : p.slice(0, i); }
+  function base(p) { return String(p).split('/').pop(); }
+
+  // Everything ccx may write. Missing ones are skipped: which appear depends on the
+  // analysis type and on what the deck asked to be printed.
+  var OUTPUTS = ['.frd', '.dat', '.sta', '.cvg', '.12d', '.out'];
+
+  window.fcwebCcxRun = async function (inpPath) {
+    var fc = window.fcInstance;
+    if (!fc || !fc.FS) { return 1; }
+    try {
+      if (typeof window.fcwebNotify === 'function') {
+        window.fcwebNotify('Loading the solver\u2026', 'info');
+      }
+      await loadScript();
+    } catch (e) {
+      if (typeof window.fcwebNotify === 'function') {
+        window.fcwebNotify('Could not load the solver: ' + e.message, 'error');
+      }
+      return 1;
+    }
+
+    var job = base(inpPath).replace(/\.inp$/i, '');
+    var outDir = dirOf(inpPath);
+    try {
+      var M = await CcxModule(ccxOpts);
+      var wd = '/work';
+      try { M.FS.mkdir(wd); } catch (e) {}
+      try { M.FS.chdir(wd); } catch (e) {}
+      M.FS.writeFile(wd + '/' + job + '.inp', fc.FS.readFile(inpPath));
+
+      var rc = M.ccall('fcweb_ccx_run', 'number', ['string'], [job]);
+
+      var wrote = 0;
+      for (var i = 0; i < OUTPUTS.length; i++) {
+        var name = job + OUTPUTS[i];
+        try {
+          fc.FS.writeFile(outDir + '/' + name, M.FS.readFile(wd + '/' + name));
+          wrote++;
+        } catch (e) { /* this analysis did not produce that file */ }
+      }
+      if (rc !== 0 && typeof window.fcwebNotify === 'function') {
+        window.fcwebNotify('The solver reported an error (ccx returned ' + rc + ').', 'error');
+      } else if (!wrote && typeof window.fcwebNotify === 'function') {
+        window.fcwebNotify('The solver produced no result files.', 'error');
+      }
+      return rc | 0;
+    } catch (e) {
+      try { console.error('[fcweb] ccx failed', e); } catch (_) {}
+      if (typeof window.fcwebNotify === 'function') {
+        window.fcwebNotify('The solver failed: ' + (e && e.message ? e.message : e), 'error');
+      }
+      return 1;
+    }
+  };
+
+  window.fcwebCcxVersion = async function () {
+    try {
+      await loadScript();
+      var M = await CcxModule(ccxOpts);
+      return M.ccall('fcweb_ccx_version', 'string', [], []);
+    } catch (e) { return null; }
+  };
+})();
+
+window.fcwebColor = function(title, initialRgb){
+  return new Promise(function(resolve){
+    try{
+      var hex='#'+('000000'+((initialRgb>>>0)&0xffffff).toString(16)).slice(-6);
+      var esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');};
+      var ov=document.createElement('div');
+      ov.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif';
+      var box=document.createElement('div');
+      box.style.cssText='min-width:320px;background:#2b2b2b;color:#e8e8e8;border-radius:8px;box-shadow:0 12px 48px rgba(0,0,0,.5);overflow:hidden';
+      box.innerHTML='<div style="padding:16px 20px;font-size:15px;font-weight:600;border-bottom:1px solid #3a3a3a">'+esc(title||'Select Color')+'</div>'+
+        '<div style="padding:22px 20px;display:flex;align-items:center;gap:14px"><input type="color" style="width:64px;height:64px;border:none;background:none;cursor:pointer"><span style="font-family:monospace;font-size:14px" class="hx"></span></div>'+
+        '<div style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;background:#242424;border-top:1px solid #3a3a3a">'+
+        '<button data-a="cancel" style="padding:7px 16px;border-radius:5px;border:1px solid #4a4a4a;background:#383838;color:#fff;font-size:13px;cursor:pointer;min-width:72px">Cancel</button>'+
+        '<button data-a="ok" style="padding:7px 16px;border-radius:5px;border:1px solid #2d7dd2;background:#2d7dd2;color:#fff;font-size:13px;cursor:pointer;min-width:72px">OK</button></div>';
+      ov.appendChild(box); document.body.appendChild(ov);
+      var inp=box.querySelector('input'); var hx=box.querySelector('.hx'); inp.value=hex; hx.textContent=hex.toUpperCase();
+      inp.addEventListener('input',function(){ hx.textContent=inp.value.toUpperCase(); });
+      var done=function(val){ try{ov.remove();}catch(e){} document.removeEventListener('keydown',kd,true); resolve(val); };
+      var kd=function(e){ if(e.key==='Escape'){e.preventDefault();done(null);} };
+      document.addEventListener('keydown',kd,true);
+      box.querySelector('[data-a="ok"]').addEventListener('click',function(){ done(parseInt(inp.value.slice(1),16)); });
+      box.querySelector('[data-a="cancel"]').addEventListener('click',function(){ done(null); });
+    }catch(e){ resolve(null); }
+  });
+};
+window.fcwebPrompt = function(title, text, deflt){
+  return new Promise(function(resolve){
+    try{
+      var esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+      var ov=document.createElement('div');
+      ov.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif';
+      var box=document.createElement('div');
+      box.style.cssText='min-width:360px;max-width:520px;background:#2b2b2b;color:#e8e8e8;border-radius:8px;box-shadow:0 12px 48px rgba(0,0,0,.5);overflow:hidden';
+      box.innerHTML='<div style="padding:16px 20px;font-size:15px;font-weight:600;border-bottom:1px solid #3a3a3a">'+esc(title||'FreeCAD')+'</div>'+
+        '<div style="padding:18px 20px 6px;font-size:14px">'+esc(text||'')+'</div>'+
+        '<div style="padding:6px 20px 16px"><input type="text" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:5px;border:1px solid #4a4a4a;background:#1f1f1f;color:#fff;font-size:14px"></div>'+
+        '<div style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;background:#242424;border-top:1px solid #3a3a3a">'+
+        '<button data-a="cancel" style="padding:7px 16px;border-radius:5px;border:1px solid #4a4a4a;background:#383838;color:#fff;font-size:13px;cursor:pointer;min-width:72px">Cancel</button>'+
+        '<button data-a="ok" style="padding:7px 16px;border-radius:5px;border:1px solid #2d7dd2;background:#2d7dd2;color:#fff;font-size:13px;cursor:pointer;min-width:72px">OK</button></div>';
+      ov.appendChild(box); document.body.appendChild(ov);
+      var inp=box.querySelector('input'); inp.value=(deflt==null?'':String(deflt));
+      var done=function(val){ try{ov.remove();}catch(e){} document.removeEventListener('keydown',kd,true); resolve(val); };
+      var kd=function(e){ if(e.key==='Escape'){e.preventDefault();done(null);} else if(e.key==='Enter'){e.preventDefault();done(inp.value);} };
+      document.addEventListener('keydown',kd,true);
+      box.querySelector('[data-a="ok"]').addEventListener('click',function(){done(inp.value);});
+      box.querySelector('[data-a="cancel"]').addEventListener('click',function(){done(null);});
+      setTimeout(function(){ inp.focus(); inp.select(); },0);
+    }catch(e){ resolve(null); }
+  });
+};
+window.fcwebConfirm = function(title, text, buttonsPipe){
+  return new Promise(function(resolve){
+    try{
+      var btns=String(buttonsPipe||'').split('|').filter(function(s){return s.length>0;});
+      if(!btns.length) btns=['OK'];
+      var esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+      var ov=document.createElement('div');
+      ov.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif';
+      var box=document.createElement('div');
+      box.style.cssText='min-width:320px;max-width:520px;background:#2b2b2b;color:#e8e8e8;border-radius:8px;box-shadow:0 12px 48px rgba(0,0,0,.5);overflow:hidden';
+      var h='<div style="padding:16px 20px;font-size:15px;font-weight:600;border-bottom:1px solid #3a3a3a">'+esc(title||'FreeCAD')+'</div>'+
+            '<div style="padding:20px;font-size:14px;line-height:1.5;white-space:pre-wrap">'+esc(text||'')+'</div>'+
+            '<div style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;background:#242424;border-top:1px solid #3a3a3a">';
+      for(var i=0;i<btns.length;i++){var pr=(i===btns.length-1);h+='<button data-i="'+i+'" style="padding:7px 16px;border-radius:5px;border:1px solid '+(pr?'#2d7dd2':'#4a4a4a')+';background:'+(pr?'#2d7dd2':'#383838')+';color:#fff;font-size:13px;cursor:pointer;min-width:72px">'+esc(btns[i])+'</button>';}
+      h+='</div>'; box.innerHTML=h; ov.appendChild(box); document.body.appendChild(ov);
+      var done=function(idx){try{ov.remove();}catch(e){} document.removeEventListener('keydown',kd,true); resolve(idx);};
+      var kd=function(e){if(e.key==='Escape'){e.preventDefault();done(0);}else if(e.key==='Enter'){e.preventDefault();done(btns.length-1);}};
+      document.addEventListener('keydown',kd,true);
+      var els=box.querySelectorAll('button');
+      for(var j=0;j<els.length;j++){(function(el){el.addEventListener('click',function(){done(parseInt(el.getAttribute('data-i'),10));});})(els[j]);}
+      var last=box.querySelector('button[data-i="'+(btns.length-1)+'"]'); if(last)last.focus();
+    }catch(e){ resolve(0); }
+  });
+};
+
+// ---- touch input ---------------------------------------------------------
+// Qt-for-WebAssembly listens for mouse/wheel on its canvas; a bare touch produces
+// none of those on its own, so the 3D view was dead on tablets. Map the gestures
+// people expect onto the events Coin's navigation already handles:
+//   1 finger drag  -> left-drag   (rotate)
+//   2 finger drag  -> middle-drag (pan)
+//   2 finger pinch -> wheel       (zoom)
+//   tap            -> click       (select)
+// Attached in capture phase on #screen so it also sees the canvas inside Qt's
+// shadow DOM. Passive:false because we must preventDefault to stop the browser
+// scrolling/zooming the page out from under the canvas.
+(function () {
+  if (typeof window === 'undefined' || !('ontouchstart' in window)) { return; }
+  var TAP_MS = 250, TAP_SLOP = 8;
+  var mode = 0, last = null, startT = 0, startPt = null, pinch0 = 0, moved = 0;
+  var mid = function (t) {
+    return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
+  };
+  var dist = function (t) {
+    return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  };
+  // Qt 6.9-for-wasm listens for pointerdown/pointermove/pointerup (grep qwasmwindow.cpp)
+  // -- NOT mouse events -- so dispatching MouseEvent did nothing at all. And a real
+  // finger produces pointerType "touch", which Qt turns into a QTouchEvent that Coin's
+  // 3D navigation ignores. So synthesize POINTER events and label them "mouse": Qt then
+  // delivers QMouseEvent, which is the path the viewport actually handles.
+  var PTR = { pointerdown: 'pointerdown', pointermove: 'pointermove', pointerup: 'pointerup' };
+  var send = function (el, type, x, y, btn, extra) {
+    var init = { bubbles: true, cancelable: true, composed: true,
+                 clientX: x, clientY: y, screenX: x, screenY: y,
+                 button: (type === 'pointermove' ? -1 : btn),
+                 buttons: (type === 'pointerup') ? 0 : (btn === 0 ? 1 : (btn === 1 ? 4 : 0)),
+                 pointerId: 1, pointerType: 'mouse', isPrimary: true,
+                 width: 1, height: 1, pressure: (type === 'pointerup') ? 0 : 0.5 };
+    if (extra && 'deltaY' in extra) {
+      el.dispatchEvent(new WheelEvent('wheel', {
+        bubbles: true, cancelable: true, composed: true,
+        clientX: x, clientY: y, deltaY: extra.deltaY, deltaMode: 0
+      }));
+      return;
+    }
+    if (extra) { for (var k in extra) { init[k] = extra[k]; } }
+    var name = PTR[type] || type;
+    try { el.dispatchEvent(new PointerEvent(name, init)); }
+    catch (e) { el.dispatchEvent(new MouseEvent(type, init)); }   // very old browsers
+  };
+  // Qt renders into a canvas inside the shadow root of #qt-shadow-container -- it is NOT
+  // a child of #screen (verified: screenContainsCanvas === false). Listening on #screen
+  // therefore never sees the touches, and mouse events dispatched there never reach Qt.
+  // Both listeners and synthesized events have to go on the canvas itself. It appears
+  // some time after boot, so poll for it.
+  var findCanvas = function () {
+    var host = document.getElementById('qt-shadow-container');
+    var sr = host && host.shadowRoot;
+    return (sr && sr.querySelector('canvas')) || document.querySelector('canvas') || null;
+  };
+  var attach = function (el) {
+    el.addEventListener('touchstart', function (e) {
+      var t = e.touches; moved = 0; startT = Date.now();
+      if (t.length === 1) {
+        mode = 1; last = { x: t[0].clientX, y: t[0].clientY }; startPt = last;
+        send(el, 'pointerdown', last.x, last.y, 0);
+      } else if (t.length === 2) {
+        if (mode === 1 && last) { send(el, 'pointerup', last.x, last.y, 0); }
+        mode = 2; last = mid(t); pinch0 = dist(t);
+        send(el, 'pointerdown', last.x, last.y, 1);
+      }
+      e.preventDefault();
+    }, { passive: false, capture: true });
+
+    el.addEventListener('touchmove', function (e) {
+      var t = e.touches;
+      if (mode === 1 && t.length === 1) {
+        var p = { x: t[0].clientX, y: t[0].clientY };
+        moved += Math.hypot(p.x - last.x, p.y - last.y); last = p;
+        send(el, 'pointermove', p.x, p.y, 0);
+      } else if (mode === 2 && t.length === 2) {
+        var m = mid(t), d = dist(t);
+        moved += Math.hypot(m.x - last.x, m.y - last.y);
+        send(el, 'pointermove', m.x, m.y, 1);
+        // pinch -> wheel; 1 wheel notch per ~8px of separation change
+        if (pinch0 > 0 && Math.abs(d - pinch0) > 8) {
+          send(el, 'wheel', m.x, m.y, 0, { deltaY: (pinch0 - d) * 2, deltaMode: 0 });
+          pinch0 = d;
+        }
+        last = m;
+      }
+      e.preventDefault();
+    }, { passive: false, capture: true });
+
+    var end = function (e) {
+      if (mode === 1 && last) {
+        send(el, 'pointerup', last.x, last.y, 0);
+        if (Date.now() - startT < TAP_MS && moved < TAP_SLOP && startPt) {
+          send(el, 'click', startPt.x, startPt.y, 0);   // tap = select
+        }
+      } else if (mode === 2 && last) {
+        send(el, 'pointerup', last.x, last.y, 1);
+      }
+      if (!e.touches || e.touches.length === 0) { mode = 0; last = null; }
+      if (e.cancelable) { e.preventDefault(); }
+    };
+    el.addEventListener('touchend', end, { passive: false, capture: true });
+    el.addEventListener('touchcancel', end, { passive: false, capture: true });
+  };
+  // FreeCAD's default CAD navigation makes LEFT-drag "select", not "rotate" (verified:
+  // a real left-drag leaves the camera untouched while a middle-drag pans). So feeding
+  // one-finger gestures in as a left-drag correctly does nothing. FreeCAD ships
+  // GestureNavigationStyle for exactly this input model -- "Drag screen with one finger
+  // OR press left mouse button" -- so switch to it on touch devices and let FreeCAD's own
+  // touch-oriented navigation interpret the gestures.
+  window.__fcwebUseGestureNav = function () {
+    try {
+      var m = window.fcInstance;
+      if (!window.__fcAppReady || !m || !m._fcweb_run_python) { return false; }
+      var py = [
+        "import FreeCAD as App",
+        "try:",
+        "    import FreeCADGui as Gui",
+        "    App.ParamGet('User parameter:BaseApp/Preferences/View')"
+          + ".SetString('NavigationStyle','Gui::GestureNavigationStyle')",
+        "    for _d in Gui.listDocuments():",
+        "        _gd = Gui.getDocument(_d)",
+        "        for _v in (_gd.ActiveView,) if _gd and _gd.ActiveView else ():",
+        "            try: _v.setNavigationType('Gui::GestureNavigationStyle')",
+        "            except Exception: pass",
+        "except Exception:",
+        "    pass",
+        ""
+      ].join('\n');
+      var n = new TextEncoder().encode(py).length + 1, q = m._malloc(n);
+      m.stringToUTF8(py, q, n);
+      (window.fcRunPy || function (mm, pp) { mm._fcweb_run_python(pp); mm._free(pp); })(m, q);
+      return true;
+    } catch (e) { return false; }
+  };
+
+  // Wait for Qt to create its canvas, then bind once.
+  var bound = null;
+  var iv = setInterval(function () {
+    var c = findCanvas();
+    if (!c || c === bound) { return; }
+    bound = c;
+    attach(c);
+    // Give FreeCAD the navigation style built for finger input.
+    try { window.__fcwebUseGestureNav(); } catch (e) {}
+    if (typeof console !== 'undefined' && console.debug) {
+      console.debug('[fcweb] touch bound to Qt canvas');
+    }
+    clearInterval(iv);
+  }, 300);
+  setTimeout(function () { clearInterval(iv); }, 120000);
+})();
+
+// ---- user-facing notices -------------------------------------------------
+// Failures used to go only to the console or FreeCAD's Report view, so a user
+// clicking "mesh this" just saw nothing happen (gmsh's QProcess path fails
+// silently when the binary is absent). Anything the user should know about
+// goes through here instead.
+window.fcwebNotify = function (text, kind, actions) {
+  try {
+    var host = document.getElementById('fcweb-toasts');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'fcweb-toasts';
+      host.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:2147483100;' +
+        'display:flex;flex-direction:column;gap:8px;max-width:min(420px,90vw);pointer-events:none';
+      document.body.appendChild(host);
+    }
+    var bg = kind === 'error' ? '#5b2333' : (kind === 'warn' ? '#4a3a1c' : '#243043');
+    var bd = kind === 'error' ? '#a13d55' : (kind === 'warn' ? '#8a6d2f' : '#3c5578');
+    var t = document.createElement('div');
+    t.style.cssText = 'pointer-events:auto;background:' + bg + ';border:1px solid ' + bd + ';' +
+      'color:#e8e8e8;border-radius:8px;padding:11px 13px;font:13px -apple-system,Segoe UI,Roboto,sans-serif;' +
+      'box-shadow:0 8px 28px rgba(0,0,0,.45);line-height:1.45;opacity:0;transition:opacity .15s';
+    var msg = document.createElement('div');
+    msg.textContent = String(text == null ? '' : text);
+    var x = document.createElement('button');
+    x.textContent = '×';
+    x.setAttribute('aria-label', 'Dismiss');
+    x.style.cssText = 'float:right;margin:-4px -4px 0 8px;background:none;border:none;color:#cfcfcf;' +
+      'font-size:17px;line-height:1;cursor:pointer';
+    var kill = function () { try { t.remove(); } catch (e) {} };
+    x.addEventListener('click', kill);
+    t.appendChild(x); t.appendChild(msg);
+    if (actions && actions.length) {
+      var row = document.createElement('div');
+      row.style.cssText = 'margin-top:9px;display:flex;gap:8px;flex-wrap:wrap';
+      actions.forEach(function (a) {
+        var btn = document.createElement('button');
+        btn.textContent = a.label;
+        btn.style.cssText = 'background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.28);' +
+          'color:#e8e8e8;border-radius:6px;padding:5px 10px;font:12px inherit;cursor:pointer';
+        btn.addEventListener('click', function () { try { a.onClick(btn); } catch (e) {} });
+        row.appendChild(btn);
+      });
+      t.appendChild(row);
+    }
+    host.appendChild(t);
+    requestAnimationFrame(function () { t.style.opacity = '1'; });
+    if (kind !== 'error') { setTimeout(function () { t.style.opacity = '0'; setTimeout(kill, 200); }, 9000); }
+  } catch (e) { try { console.warn('[fcweb] notify failed', e, text); } catch (_) {} }
+};
+</script>
+<script>
+// ---- installability ----------------------------------------------------------------
+// Chrome grants persistent storage automatically to an INSTALLED app, and refuses it
+// otherwise (measured: three engaged visits, still denied). Persistent storage is what
+// stops the browser evicting a user's documents when the disk gets tight, so making the
+// app installable is a data-safety feature before it is a convenience.
+(function () {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').then(function (r) {
+        console.log('[fcweb] service worker registered, scope ' + r.scope);
+      }, function (e) {
+        console.log('[fcweb] service worker registration failed: ' + e.message);
+      });
+    });
+  }
+  var deferred = null;
+  var installOffered = false;
+  // Capture the prompt but DO NOT use it yet. Chrome fires this on arrival, when the user
+  // has done nothing, has nothing to lose, and has no reason to say yes -- and the offer is
+  // one-shot, so spending it there wastes the only lever we have. Installation is the ONLY
+  // way to get navigator.storage.persist() granted (measured: denied on three separate
+  // engaged visits to a normal profile, see BUILD-WEH.md), and until it is granted the
+  // browser may evict a user's saved documents to reclaim disk. So the ask is deferred to
+  // the moment it is concretely true: right after they first save real work.
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferred = e;
+    window.__fcInstallable = true;
+  });
+  // Called once the user has actually saved something worth keeping.
+  window.fcwebOfferInstall = function () {
+    if (installOffered || !deferred || typeof window.fcwebNotify !== 'function') { return; }
+    installOffered = true;
+    window.fcwebNotify(
+      'Your work is saved in this browser — which means it can be cleared to reclaim disk ' +
+      'space. Installing FreeCAD as an app stops that, and opens it in its own window.',
+      'info',
+      [{ label: 'Install', onClick: function (btn) {
+          btn.textContent = 'Installing…';
+          deferred.prompt();
+          deferred.userChoice.then(function (c) {
+            btn.textContent = c.outcome === 'accepted' ? 'Installed' : 'Not now';
+            if (c.outcome === 'accepted' && navigator.storage && navigator.storage.persist) {
+              navigator.storage.persist().then(function (ok) {
+                console.log('[fcweb] persistent storage after install: ' + ok);
+              });
+            }
+          });
+        } }]);
+  };
+  // Fallback for the browsers/profiles where beforeinstallprompt never fires (already
+  // installed, or Chrome declining to offer): say the true thing once, and offer the fix
+  // that does not depend on the browser's goodwill at all.
+  window.fcwebWarnEvictable = function () {
+    if (installOffered || deferred) { return; }
+    installOffered = true;
+    if (!navigator.storage || !navigator.storage.persisted) { return; }
+    navigator.storage.persisted().then(function (ok) {
+      if (ok || typeof window.fcwebNotify !== 'function') { return; }
+      var actions = [];
+      if (window.showDirectoryPicker) {
+        actions.push({ label: 'Choose a backup folder', onClick: function (btn) {
+          btn.textContent = 'Choosing…';
+          window.fcwebChooseBackupFolder().then(function (okd) {
+            btn.textContent = okd ? 'Backups on' : 'Not now';
+          });
+        } });
+      }
+      window.fcwebNotify(
+        'Your documents are stored in this browser, which means it can clear them to ' +
+        'reclaim disk space. Pick a folder and they will be copied there as you work.',
+        'info', actions);
+    });
+  };
+  // One entry point for "the user just saved real work", so the two paths above cannot
+  // both fire and cannot fire before there is anything to protect.
+  window.__fcWorkSaved = function () {
+    try { window.fcwebOfferInstall(); window.fcwebWarnEvictable(); } catch (e) {}
+  };
+
+  // ---- Backup folder ------------------------------------------------------------------
+  // Everything above is damage limitation: the browser owns the storage and may clear it,
+  // and persist() is only granted to an installed app. This removes the dependency instead
+  // of mitigating it -- the user nominates a real directory, and autosave copies are
+  // mirrored there. That survives eviction, survives "clear site data", and is visible in
+  // their file manager, which is where a CAD user expects their work to be anyway.
+  //
+  // The handle is kept in IndexedDB because a FileSystemDirectoryHandle is structured-
+  // cloneable but not serialisable to a string; permission has to be re-granted on a later
+  // visit, which the browser makes a one-click prompt for a handle it already knows.
+  var FCDB = 'fcweb-handles', FCSTORE = 'handles';
+  function idb() {
+    return new Promise(function (res, rej) {
+      var r = indexedDB.open(FCDB, 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore(FCSTORE); };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
+  }
+  function idbPut(k, v) {
+    return idb().then(function (db) {
+      return new Promise(function (res, rej) {
+        var t = db.transaction(FCSTORE, 'readwrite');
+        t.objectStore(FCSTORE).put(v, k);
+        t.oncomplete = res; t.onerror = function () { rej(t.error); };
+      });
+    });
+  }
+  function idbGet(k) {
+    return idb().then(function (db) {
+      return new Promise(function (res, rej) {
+        var t = db.transaction(FCSTORE, 'readonly');
+        var q = t.objectStore(FCSTORE).get(k);
+        q.onsuccess = function () { res(q.result || null); };
+        q.onerror = function () { rej(q.error); };
+      });
+    });
+  }
+
+  var backupDir = null;
+
+  window.fcwebChooseBackupFolder = async function () {
+    if (!window.showDirectoryPicker) {
+      window.fcwebNotify && window.fcwebNotify(
+        'This browser cannot open a folder picker, so backups stay inside the browser. ' +
+        'Use File → Save to keep copies on your machine.', 'warn');
+      return false;
+    }
+    try {
+      // Must be called from a user gesture, which is why this is a function the UI calls
+      // rather than something attempted automatically at boot.
+      var h = await window.showDirectoryPicker({ id: 'fcweb-backups', mode: 'readwrite' });
+      await idbPut('backupDir', h);
+      backupDir = h;
+      window.fcwebNotify && window.fcwebNotify(
+        'Backups on. Your documents will be copied to that folder as you work.', 'info');
+      window.fcwebEvent && window.fcwebEvent('backup_dir', 'chosen');
+      await window.__fcMirrorOut();
+      return true;
+    } catch (e) {
+      return false;                         // user dismissed the picker; not an error
+    }
+  };
+
+  // Re-attach a previously chosen folder. Never prompts: if the permission has lapsed the
+  // user is asked the next time they choose one, rather than being ambushed at boot.
+  window.__fcRestoreBackupDir = async function () {
+    try {
+      var h = await idbGet('backupDir');
+      if (!h || !h.queryPermission) { return false; }
+      var p = await h.queryPermission({ mode: 'readwrite' });
+      if (p === 'granted') { backupDir = h; return true; }
+      window.__fcBackupNeedsPermission = true;   // surfaced by the status line below
+      return false;
+    } catch (e) { return false; }
+  };
+
+  window.fcwebRegrantBackupFolder = async function () {
+    try {
+      var h = backupDir || await idbGet('backupDir');
+      if (!h || !h.requestPermission) { return false; }
+      var p = await h.requestPermission({ mode: 'readwrite' });   // needs a user gesture
+      if (p === 'granted') {
+        backupDir = h; window.__fcBackupNeedsPermission = false;
+        await window.__fcMirrorOut();
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  };
+
+  // Copy the autosave directory out. Only writes files whose size or mtime changed, so a
+  // large model is not rewritten to disk every tick.
+  var mirrorState = {};
+  window.__fcMirrorOut = async function () {
+    if (!backupDir) { return 0; }
+    var m = window.fcInstance;
+    if (!m || !m.FS) { return 0; }
+    var dir = '/home/web_user/.fcweb-autosave', names;
+    try { names = m.FS.readdir(dir).filter(function (n) { return /\.FCStd$/i.test(n); }); }
+    catch (e) { return 0; }
+    var written = 0;
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i], path = dir + '/' + name;
+      try {
+        var st = m.FS.stat(path);
+        var sig = st.size + ':' + (st.mtime && st.mtime.getTime ? st.mtime.getTime() : 0);
+        if (mirrorState[name] === sig) { continue; }
+        var bytes = m.FS.readFile(path);
+        var fh = await backupDir.getFileHandle(name, { create: true });
+        var w = await fh.createWritable();
+        await w.write(bytes); await w.close();
+        mirrorState[name] = sig; written++;
+      } catch (e) {
+        // A revoked permission or a removed folder must not break autosave itself.
+        window.__fcBackupNeedsPermission = true; backupDir = null; break;
+      }
+    }
+    if (written) { window.fcwebEvent && window.fcwebEvent('backup_write'); }
+    return written;
+  };
+  window.addEventListener('appinstalled', function () {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().then(function (ok) {
+        if (ok && typeof window.fcwebNotify === 'function') {
+          window.fcwebNotify('Installed. Your documents are now stored persistently.', 'info');
+        }
+      });
+    }
+  });
+})();
+// ---- crash reporting and storage health ------------------------------------------
+// Until now a trap reached the console and nowhere else: the user saw the app stop
+// responding with no explanation, and we never learned it happened. Two things are
+// needed for a public build -- the user has to be TOLD, and they need a way to hand us
+// something actionable.
+(function () {
+  var RING = [];                       // recent log lines, for the diagnostic report
+  var MAX_RING = 120;
+  var seen = new Set();                // one toast per distinct failure
+  window.fcwebLogRing = function (line) {
+    if (typeof line !== 'string') return;
+    RING.push(line.length > 400 ? line.slice(0, 400) + '…' : line);
+    if (RING.length > MAX_RING) RING.shift();
+  };
+
+  function report(kind, detail) {
+    var m = window.fcInstance;
+    var docs = '?';
+    try { docs = m && m.FS ? m.FS.readdir('/home/web_user/.fcweb-autosave')
+      .filter(function (f) { return f.endsWith('.FCStd'); }).join(',') : '?'; } catch (e) { docs = '?'; }
+    return [
+      'FreeCAD-Web diagnostic report',
+      'when:      ' + new Date().toISOString(),
+      'kind:      ' + kind,
+      'detail:    ' + String(detail).slice(0, 1500),
+      'page:      ' + location.href,
+      'browser:   ' + navigator.userAgent,
+      'memory:    ' + (m && m.HEAPU8 ? (m.HEAPU8.length / 1048576).toFixed(0) + ' MB heap' : 'n/a') +
+        (performance.memory ? ', js ' + (performance.memory.usedJSHeapSize / 1048576).toFixed(0) + ' MB' : ''),
+      'autosaved: ' + docs,
+      '',
+      '--- last ' + RING.length + ' log lines ---',
+      RING.join('\n'),
+    ].join('\n');
+  }
+
+  // One toast per distinct failure, with the two things a user can actually do:
+  // take their work with them, and give us something to act on.
+  window.fcwebCrash = function (kind, detail) {
+    var key = kind + '|' + String(detail).slice(0, 120);
+    if (seen.has(key)) return;
+    seen.add(key);
+    // Count it. Until now a script error or an unhandled rejection was shown to the ONE
+    // user who hit it and to nobody else: the toast offers a report, but that needs them
+    // to copy it and open an issue, so anything short of a determined user is invisible.
+    // Only wasm aborts were counted, which meant the failure classes we knew least about
+    // were also the ones we could not see.
+    //
+    // This sends the CLASS and nothing else -- an enumerated word from the list below, no
+    // message, no stack, no document name, no identifier. The detail stays on the user's
+    // clipboard where they decide what to do with it. A counter that says "37 rejections
+    // yesterday" is enough to know something is wrong and to go looking.
+    try {
+      var klass = kind === 'script error' ? 'script'
+                : kind === 'unhandled rejection' ? 'rejection'
+                : kind === 'wasm abort' ? null      // already counted, do not double-count
+                : 'other';
+      if (klass) { window.fcwebEvent && window.fcwebEvent('crash', klass); }
+    } catch (e) { /* a counter must never break the crash path it reports on */ }
+    var text = 'Something went wrong (' + kind + '). Your work is autosaved and will be ' +
+               'restored if you reload. If it keeps happening, please send us the report.';
+    if (typeof window.fcwebNotify !== 'function') { try { console.error(text, detail); } catch (e) {} return; }
+    window.fcwebNotify(text, 'error', [
+      { label: 'Copy report', onClick: function (btn) {
+          var txt = report(kind, detail);
+          var done = function () { btn.textContent = 'Copied'; };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(txt).then(done, function () { fallback(txt, done); });
+          } else { fallback(txt, done); }
+        } },
+      // The report goes on the clipboard, never into the URL -- it carries a user's
+      // document names and page state.
+      { label: 'Open issue tracker', onClick: function () {
+          console.warn('External issue reporter disabled in this OS build.');
+        } },
+    ]);
+  };
+  function fallback(txt, done) {
+    var ta = document.createElement('textarea');
+    ta.value = txt; ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    ta.remove();
+  }
+
+  window.addEventListener('error', function (e) {
+    if (e && e.message) window.fcwebCrash('script error', e.message + ' @' + (e.filename || '?') + ':' + (e.lineno || 0));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    window.fcwebCrash('unhandled rejection', (r && (r.stack || r.message)) || String(r));
+  });
+
+  // ---- storage health --------------------------------------------------------------
+  // Everything the persistence work bought is void if the browser evicts the database or
+  // it fills up: saves then fail silently, which is the exact failure mode we just spent
+  // a day removing. Ask for persistent storage (a browser may evict non-persistent
+  // origins under pressure), and watch how full it is.
+  window.addEventListener('load', function () {
+    if (!navigator.storage) return;
+    try {
+      if (navigator.storage.persist) {
+        navigator.storage.persisted().then(function (already) {
+          if (already) { console.log('[fcweb] storage already persistent'); return; }
+          navigator.storage.persist().then(function (ok) {
+            console.log('[fcweb] persistent storage ' + (ok ? 'granted' : 'DENIED (work may be evicted)'));
+          });
+        });
+      }
+    } catch (e) {}
+    var warned = false;
+    setInterval(function () {
+      if (!navigator.storage.estimate) return;
+      navigator.storage.estimate().then(function (q) {
+        if (!q || !q.quota) return;
+        var pct = q.usage / q.quota;
+        if (pct > 0.85 && !warned && typeof window.fcwebNotify === 'function') {
+          warned = true;
+          window.fcwebNotify('Browser storage is ' + Math.round(pct * 100) + '% full (' +
+            (q.usage / 1048576).toFixed(0) + ' of ' + (q.quota / 1048576).toFixed(0) + ' MB). ' +
+            'Saving may start to fail — download anything you need to keep.', 'warn');
+        }
+        if (pct < 0.7) warned = false;
+      }).catch(function () {});
+    }, 60000);
+  });
+})();
+</script>
+<script>
+ const logEl=document.getElementById('log');
+ const __t0=performance.now();
+ const __bootEl=document.getElementById('load'), __bootStatus=document.getElementById('ld-status');
+ const __DEBUG=/[?&]debug/.test(location.search);
+ // Boot-progress noise: emscripten download/dep counters + our own diagnostic
+ // markers. Never shown in the log unless ?debug; instead summarized in the
+ // loading overlay. This is what looked like "tons of errors": pure progress spam.
+ const __NOISE=/\[deps\] remaining|Downloading data|\bRunning\.\.\.|\[FCWEB-MARK|\[BOOTTIME|\[SPE \d|\[FCWEB\]|InitApplications|InitGui \d|all InitGui|activateWorkbench:|showMainWindow:|setBranding:|loadOpenInventor:|checkParameters:|execute:(begin|end)|mw wrapper singleton|pyside warmup|emscripten GL emulation|immediate mode emulation/;
+ const __bootFill=document.getElementById('ld-fill'), __bootDetail=document.getElementById('ld-detail');
+ // Drive the themed overlay: uppercase phase label (#ld-status), progress bar (#ld-fill),
+ // and a monospace detail line (#ld-detail). A numeric "… NN%" switches the bar to
+ // determinate; otherwise it stays indeterminate. Errors turn the whole overlay red.
+ function __setBoot(msg,isErr){
+   if(isErr){ if(__bootEl) __bootEl.classList.add('err'); if(__bootStatus){ __bootStatus.textContent='Error';  } if(__bootDetail) __bootDetail.textContent=String(msg).slice(0,140); return; }
+   if(!__bootStatus) return;
+   const m=/(.*?)\s*(\d+)\s*%/.exec(String(msg));
+   if(m){
+     if(__bootEl) __bootEl.classList.remove('indet');
+     if(__bootFill) __bootFill.style.width=Math.max(2,Math.min(100,+m[2]))+'%';
+     __bootStatus.textContent=(m[1]||'Downloading').replace(/[…\.\s]+$/,'')||'Downloading';
+     if(__bootDetail) __bootDetail.textContent=m[2]+'% of ~115 MB';
+   } else {
+     if(__bootEl) __bootEl.classList.add('indet');
+     // strip trailing "(…)" into the detail line so the label stays short + uppercase-clean
+     const paren=/^(.*?)\s*\((.*)\)\s*$/.exec(String(msg));
+     if(paren){ __bootStatus.textContent=paren[1].replace(/[…\.\s]+$/,'')||paren[1]; if(__bootDetail) __bootDetail.textContent=paren[2]; }
+     else { __bootStatus.textContent=String(msg).replace(/…$/,''); if(__bootDetail) __bootDetail.textContent=''; }
+   }
+    if(__bootEl) __bootEl.classList.remove('err');
+ }
+ // Reveal the app only once BOTH the loader says it's ready AND the Qt window has gone
+ // fullscreen. Qt-wasm paints a vestigial title bar; if we reveal first and strip it after,
+ // the user sees the title bar flash away (it used to be visible ~2.5s: overlay dropped at
+ // ~1.5s, showFullScreen ran at 4s). Gate the reveal on both, with a timeout so the overlay
+ // can never get stuck covering a working app.
+ var __bootReady=false, __fsReady=false;
+ function __maybeReveal(){ if(__bootReady && __fsReady && __bootEl) __bootEl.classList.add('hide'); }
+ function __hideBoot(){ __bootReady=true; __maybeReveal(); }
+ function __fsApplied(){ __fsReady=true; __maybeReveal(); }
+ setTimeout(function(){ __fsReady=true; __maybeReveal(); }, 15000); // safety net
+ // FCWEB: append() was THE boot bottleneck. FreeCAD prints thousands of lines at
+ // startup; the old impl created a DOM node per line AND forced a synchronous
+ // reflow every line (scrollTop=scrollHeight), making boot O(n^2) — ~90s of pure
+ // DOM thrash on the main thread (the "page unresponsive" freeze). Now: keep a
+ // capped ring buffer and flush to the DOM once per animation frame (one reflow
+ // per frame, not per line), so logging is O(1) amortized regardless of volume.
+ const __LOG_CAP=400; let __logBuf=[]; let __flushQueued=false; let __errPending=false;
+ function __flushLog(){ __flushQueued=false;
+   if(__logBuf.length>__LOG_CAP) __logBuf=__logBuf.slice(-__LOG_CAP);
+   logEl.textContent=__logBuf.join('\n'); if(__errPending){logEl.classList.add('err');__errPending=false;}
+   logEl.scrollTop=logEl.scrollHeight; }
+ // Failures FreeCAD reports on its Console land in this log, which the user never
+ // reads (it is hidden by default). Promote the ones that mean "the thing you just
+ // asked for did not happen" into a visible toast. Matched once each so a retry loop
+ // cannot spam.
+ // NOTE on the first two rules: Gmsh and CalculiX ARE in this build, as separate wasm
+ // modules (gmsh.wasm / ccx.wasm) reached through window.fcwebGmshRun / fcwebCcxRun.
+ // These messages used to say the tools "are not part of the browser build", which was
+ // false -- and worse, misleading in the exact case that produces them. The known cause
+ // is the bridge being unreachable, not absent: it lives on the MAIN thread and JSPI can
+ // only suspend the main stack, so anything running the solver from a worker gets
+ // available()==False and falls through to a "binary not found" path. That shipped once
+ // (BUILD-WEH.md, "FEM in the browser: never run its tasks on a thread") and the Solve
+ // button had never worked. So describe the failure, and say which build it happened on.
+ const __NOTIFY_RULES = [
+   [/Gmsh binary .* not found|Gmsh executable not found|No standard location implemented/i,
+    'Meshing could not start: the browser could not reach the Gmsh module. ' +
+    'Reload the page and try again — if it keeps happening, please report it' +
+    (window.FCWEB_BUILD ? ' quoting build ' + window.FCWEB_BUILD + '.' : '.')],
+   [/CalculiX binary .* not found|No or wrong CalculiX binary|CalculiX binary has not been found/i,
+    'The solve could not start: the browser could not reach the CalculiX module. ' +
+    'Reload the page and try again — if it keeps happening, please report it' +
+    (window.FCWEB_BUILD ? ' quoting build ' + window.FCWEB_BUILD + '.' : '.')],
+   [/doesn't contain expected phrase/i,
+    'The configured solver binary did not respond as expected, so the solve was skipped.'],
+   // Out of wasm memory. The heap is a FIXED 2 GB (growth is deliberately off -- see
+   // scratchpad/linkcmds/fc-linkcmd-weh-grow.sh and the note in BUILD-WEH.md), so a big
+   // enough model aborts. Say so in words instead of dying silently.
+   [/Cannot enlarge memory|OOM|out of memory|Aborted\(OOM\)|memory allocation failed/i,
+    'This model needs more memory than the browser build has (the limit is 2 GB). ' +
+    'Try simplifying it, meshing more coarsely, or closing other documents. ' +
+    'Your open work has been autosaved.'],
+   // pre-gui.js emits this when FS.syncfs fails -- browser storage full, evicted, or
+   // blocked. Autosave is writing into a void from this point on.
+   [/IDBFS persist failed|QuotaExceeded/i,
+    'Your work is NOT being saved: the browser refused to write to local storage ' +
+    '(it may be full, or private browsing may be blocking it). Use File \u2192 Save to ' +
+    'download a copy now.'],
+ ];
+ const __notified = new Set();
+ function __maybeNotify(t){
+   if (typeof t !== 'string' || typeof window.fcwebNotify !== 'function') return;
+   for (const [re, msg] of __NOTIFY_RULES) {
+     if (re.test(t) && !__notified.has(msg)) { __notified.add(msg); window.fcwebNotify(msg, 'warn'); return; }
+   }
+ }
+ function append(t,cls){
+   // FCWEB: the 3D widget's on-screen rect (CSS px, in-window) is published from
+   // Python (only Qt knows the MDI layout). Capture it for the overlay compositor
+   // and don't spam the log with it.
+   if(typeof t==='string'){ const mR=t.indexOf('FCRECT '); if(mR>=0){
+     try{ window.__fcWidgetRect=JSON.parse(t.slice(mR+7)); }catch(e){} return; } }
+   try { __maybeNotify(t); } catch(e){}
+   try { if (window.fcwebLogRing) window.fcwebLogRing(t); } catch(e){}
+   const noise = typeof t==='string' && __NOISE.test(t);
+   // Progress noise (incl. our stderr diagnostic markers) is dropped unless
+   // ?debug; genuine errors/messages are never noise, so they still show. The log
+   // stays clean and readable when opened via the toggle.
+   if(__DEBUG || !noise){
+     __logBuf.push("{"+((performance.now()-__t0)/1000).toFixed(1)+"s} "+t);
+     if(cls==='err') __errPending=true;
+     if(!__flushQueued){ __flushQueued=true; requestAnimationFrame(__flushLog); }
+   }
+   // Surface real errors in the loading overlay so a boot failure isn't invisible.
+   // Only genuinely-fatal boot messages turn the overlay red — stderr WARNING/INFO
+   // lines (e.g. the benign "using emscripten GL immediate mode emulation") must not
+   // hijack the loading screen. Anything not fatal is dropped (it's boot noise).
+   if(cls==='err' && !noise && __bootEl && !__bootEl.classList.contains('hide')
+      && /\b(abort|aborted|fatal|uncaught|RuntimeError|cannot|failed to|out of memory|not supported)\b/i.test(String(t))
+      && !/\bWARNING\b/i.test(String(t))) __setBoot(String(t).slice(0,140),true);
+   // Optional: persist FCWEB diagnostic markers to the server synchronously (for
+   // trap localization). Gated on ?fcmark to avoid slowing normal runs.
+   try { if(window.__FCMARK && typeof t==='string' && t.indexOf('FCWEB-')>=0){
+     var x=new XMLHttpRequest(); x.open('POST','/mark',false); x.send(t); } } catch(e){} }
+ let stackDumps=0;
+ window.addEventListener('error',e=>{ append('window error: '+e.message,'err');
+   if(e.error&&e.error.stack&&stackDumps<4){ stackDumps++; append('STACK:\n'+e.error.stack,'err'); }});
+ // Toggle the (hidden-by-default) boot log for debugging.
+ document.getElementById('logtoggle').addEventListener('click',()=>{
+   document.getElementById('log').classList.toggle('hidden'); });
+ // Fallback: if onLoaded never fires (older loader path), drop the overlay once
+ // the app is clearly up so it can't get stuck covering the UI.
+ (function(){ window.FC_JSPI = true; // JSPI build: exports may return a Promise; dialogs are REAL modal
+// Serialize entry into the single-threaded CPython interpreter. Under JSPI a
+// _fcweb_run_python call can SUSPEND (e.g. a long document restore that pumps a
+// progress bar) and yield to the JS event loop; if a setInterval then fires a
+// SECOND _fcweb_run_python, it re-enters CPython while the first is suspended
+// mid-restore -> thread-state corruption / permanent deadlock (this is exactly
+// what froze opening FEMExample). window.__fcPyBusy is true whenever a call is
+// in flight (including while suspended); periodic callers below skip their tick
+// while it's set, so nothing re-enters the interpreter concurrently.
+window.__fcPyBusy = window.__fcPyBusy || false;
+function fcRunPy(m, ptr){
+  var r;
+  window.__fcPyBusy = true;
+  try { r = m._fcweb_run_python(ptr); }
+  catch(e){ window.__fcPyBusy = false; m._free(ptr); throw e; }
+  if (r && typeof r.then === 'function') {
+    r.then(()=>{ m._free(ptr); window.__fcPyBusy = false; },
+           (e)=>{ m._free(ptr); window.__fcPyBusy = false;
+                  // A rejected JSPI call means the C++ side threw or trapped out of
+                  // _fcweb_run_python. Swallowing it silently makes that look exactly
+                  // like a hang (the Python simply stops, no traceback, no error), which
+                  // is how the FEM .vtu failure hid for so long. Always surface it.
+                  // String(e) on a wasm trap gives "[object Object]", which names
+                  // nothing. Keep the stack -- with --profiling-funcs the frames carry
+                  // real C++ names, and that is the difference between "something
+                  // failed" and "vtkXMLParser::GetXMLByteIndex trapped".
+                  try {
+                    var _d = (e && (e.stack || e.message)) ? String(e.stack || e.message)
+                                                           : String(e);
+                    (window.__fcPyErrors = window.__fcPyErrors || []).push(_d);
+                  } catch(_){}
+                  try { console.error('[fcweb] python call rejected:', e); } catch(_){}
+                  try { if (typeof err === 'function') err('[fcweb] python call rejected: ' + e); } catch(_){}
+                  // A rejection here means the C++ side trapped, so the operation the
+                  // user asked for silently did nothing. Say so rather than leaving them
+                  // to wonder whether the click registered.
+                  try {
+                    if (typeof window.fcwebNotify === 'function') {
+                      window.fcwebNotify('That operation failed and was stopped (' +
+                        String(e && e.message ? e.message : e) +
+                        '). Your document is unchanged — please report this.', 'error');
+                    }
+                  } catch(_){} });
+  } else { m._free(ptr); window.__fcPyBusy = false; }
+  return r;
+}
+window.fcRunPy = fcRunPy;
+   const iv=setInterval(()=>{ const l=logEl.textContent||'';
+   if(/execute:end/.test(l) || (window.fcInstance&&window.fcInstance._malloc)){
+     setTimeout(__hideBoot,1500); clearInterval(iv); } },1000);
+   setTimeout(()=>{ __hideBoot(); clearInterval(iv); },90000); })();
+ // Go fullscreen the moment the main window exists (fast poll), NOT on the 1.5s rect
+ // publisher's first 4s tick — the reveal is gated on this, so the title bar is dropped
+ // before the app is ever shown and never flashes.
+ (function(){
+   const FS_PY=[
+     "import FreeCAD as _f, FreeCADGui as _g, sys as _s",
+     "_mw=_g.getMainWindow()",
+     "if _mw is not None and not getattr(_f,'_fcweb_fs_done',False):",
+     " _mw.showFullScreen(); _f._fcweb_fs_done=True",
+     " _s.__stderr__.write('FCFS-DONE\\n'); _s.__stderr__.flush()",
+     ""].join("\n");
+   const iv=setInterval(()=>{
+     try{
+       const m=window.fcInstance; if(!window.__fcAppReady||!m||!m._fcweb_run_python) return;
+       if(window.__fcPyBusy) return;   // don't re-enter CPython while a call is suspended
+       if(/FCFS-DONE/.test(logEl.textContent||'')){ clearInterval(iv); __fsApplied(); return; }
+       const n=new TextEncoder().encode(FS_PY).length+1, q=m._malloc(n);
+       m.stringToUTF8(FS_PY,q,n); fcRunPy(m,q);
+     }catch(e){}
+   },200);
+   setTimeout(()=>clearInterval(iv), 60000);
+ })();
+
+ // The HTML dialog bridge that used to live here has been REMOVED: Qt's own dialogs
+ // work natively on this build, so routing them through HTML was costing fidelity for
+ // no reason. Re-verified before deleting it (scratchpad/nativedlg.js, nativeexec.js,
+ // nativeinput.js):
+ //   QMessageBox  paints its title, text and buttons, and a native blocking
+ //                QDialog::exec() returns the REAL button the user clicked (16384 = Yes)
+ //                while the page stays responsive -- JSPI suspends across it.
+ //   QInputDialog paints its line edit and OK/Cancel; exec returns rc=1 with the value.
+ //   QColorDialog paints (592x431, 37 child widgets).
+ // The bridge predates JSPI: it existed because native message boxes did not composite
+ // their body and buttons, and because a Python-triggered exec() could not suspend.
+ // Both causes are gone. If a dialog ever regresses, the bridge is in git history at
+ // the commit that removed it.
+
+ // ---- Engine cache -------------------------------------------------------------
+ // The engine was NOT actually cached, on any visit. Measured against production: on a
+ // reload in the SAME profile, the 1 MB FreeCAD.js came back deliveryType:"cache" while
+ // FreeCAD.wasm (152 MB) and FreeCAD.data.gz came back deliveryType:"network" -- 113 MB
+ // and ~110 s of it, every single time. Chrome's HTTP disk cache will not retain entries
+ // that large, so "then it is cached" was simply false however long you kept the tab.
+ //
+ // Cache Storage has no such per-entry ceiling. Measured before writing this: one
+ // 152,506,718-byte entry stores in 409 ms and reads back in 111 ms, byte-identical
+ // (magic 00 61 73 6d intact), against a ~5 GB origin quota.
+ //
+ // Three deliberate choices:
+ //  - Keys are the stamped ?v= URLs, which infra/Dockerfile already content-addresses by
+ //    md5. A new build is automatically a new key, so no new versioning machinery -- and
+ //    anything not in the current set is swept on boot.
+ //  - We store SYNTHETIC Responses, never the network Response. FreeCAD.data.gz is served
+ //    with a hand-set Content-Encoding: gzip; storing the network Response risks carrying
+ //    that header onto a body the browser has ALREADY decoded, i.e. a double-decode on
+ //    read. Building our own Response sidesteps the question entirely.
+ //  - This is NOT a fetch-intercepting service worker. sw.js is a pass-through on purpose
+ //    (BUILD-WEH.md): the load it would sit in front of depends on exact Content-Encoding
+ //    and cross-origin-isolation headers, and a caching worker is an excellent way to
+ //    corrupt both.
+ const ENGINE_CACHE = 'fcweb-engine';
+ // Progress denominators. Both assets are gzip-encoded in transit, so content-length is
+ // the COMPRESSED size while the stream yields decoded bytes -- using it would run the bar
+ // to ~300%. These are nominal decoded sizes; they only scale a progress bar, and being
+ // approximately right beats a bar pinned at 100% while 113 MB is still arriving.
+ const NOMINAL = { wasm: 152 * 1048576, data: 262 * 1048576 };
+ async function __engineCache(){ try { return await caches.open(ENGINE_CACHE); } catch(e){ return null; } }
+ // Returns an ArrayBuffer, from Cache Storage when the exact stamped URL is present.
+ // Any failure falls back to a plain network fetch: a broken cache must never be fatal.
+ async function __fetchSplitAsset(url, label, onBytes){
+   let base;
+   try { base = new URL(url, location.href); } catch(e){ return null; }
+   const chunkUrl = (suffix) => {
+     const u = new URL(base.href);
+     u.pathname = base.pathname + '.parts/' + suffix;
+     return u.href;
+   };
+   const manifestUrl = chunkUrl('manifest.json');
+   let manifestRes;
+   try { manifestRes = await fetch(manifestUrl); } catch(e){ return null; }
+   if (!manifestRes.ok) { return null; }
+   const manifest = await manifestRes.json();
+   if (!manifest || !Array.isArray(manifest.parts) || !manifest.parts.length) { return null; }
+   const total = Number(manifest.size) || manifest.parts.reduce((n, p) => n + (Number(p.size) || 0), 0);
+   const out = new Uint8Array(total);
+   let offset = 0;
+   for (const part of manifest.parts) {
+     const name = String(part.name || '');
+     if (!/^part-\d+$/.test(name)) { throw new Error(label + ': invalid split part ' + name); }
+     const partUrl = chunkUrl(name);
+     const res = await fetch(partUrl);
+     if (!res.ok) { throw new Error(label + ' part ' + name + ': HTTP ' + res.status); }
+     const bytes = new Uint8Array(await res.arrayBuffer());
+     out.set(bytes, offset);
+     offset += bytes.byteLength;
+     onBytes(offset, total, false);
+   }
+   if (offset !== total) { throw new Error(label + ': split asset size mismatch'); }
+   return out.buffer;
+ }
+ async function __engineFetch(url, label, onBytes){
+   const c = await __engineCache();
+   if (c) {
+     try {
+       const hit = await c.match(url);
+       if (hit) { const b = await hit.arrayBuffer(); onBytes(b.byteLength, b.byteLength, true); return b; }
+     } catch(e){ append('engine cache read failed ('+label+'): '+e); }
+   }
+   const split = await __fetchSplitAsset(url, label, onBytes);
+   if (split) {
+     if (c) { try { await c.put(url, new Response(split, {headers:{'content-type':'application/octet-stream'}})); }
+              catch(e){ append('engine cache put failed ('+label+'): '+e); } }
+     return split;
+   }
+   const res = await fetch(url);
+   if (!res.ok) throw new Error(label+': HTTP '+res.status);
+   let buf;
+   if (res.body && res.body.getReader) {
+     const reader = res.body.getReader(); const chunks = []; let got = 0;
+     for(;;){ const r = await reader.read(); if (r.done) break;
+       chunks.push(r.value); got += r.value.length; onBytes(got, 0, false); }
+     const out = new Uint8Array(got); let o = 0;
+     for (const ch of chunks) { out.set(ch, o); o += ch.length; }
+     buf = out.buffer;
+   } else { buf = await res.arrayBuffer(); onBytes(buf.byteLength, 0, false); }
+   if (c) { try { await c.put(url, new Response(buf, {headers:{'content-type':'application/octet-stream'}})); }
+            catch(e){ append('engine cache put failed ('+label+'): '+e); } }
+   return buf;
+ }
+ // One corrupt entry would otherwise be an unrecoverable app for that user, forever.
+ window.fcwebClearEngineCache = async function(){
+   try { await caches.delete(ENGINE_CACHE); } catch(e){}
+   try { location.reload(); } catch(e){}
+ };
+ // Shown only after a real abort. Plain DOM rather than fcwebNotify, because the abort
+ // may well have taken the toast machinery down with it.
+ let __cacheResetShown = false;
+ function __offerCacheReset(){
+   if (__cacheResetShown) { return; } __cacheResetShown = true;
+   try {
+     const d = document.createElement('div');
+     d.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483647;'
+       + 'background:#2b2f36;color:#e6e6e6;border:1px solid #555;border-radius:6px;padding:12px 16px;'
+       + 'font:13px system-ui,sans-serif;max-width:min(560px,92vw);box-shadow:0 4px 16px rgba(0,0,0,.5)';
+     const p = document.createElement('div');
+     p.textContent = 'FreeCAD stopped unexpectedly. If this repeats on every reload, the '
+       + 'downloaded engine may be damaged — clearing it re-downloads about 115 MB.';
+     const b = document.createElement('button');
+     b.textContent = 'Clear cached engine and reload';
+     b.style.cssText = 'margin-top:10px;padding:6px 12px;cursor:pointer;border-radius:4px;'
+       + 'border:1px solid #777;background:#3a3f48;color:#fff;font:inherit';
+     b.onclick = function(){ window.fcwebClearEngineCache(); };
+     d.appendChild(p); d.appendChild(b); document.body.appendChild(d);
+   } catch(e){}
+ }
+
+ async function init(){
+   try { globalThis.__FCWEB_SEARCH = location.search || ''; } catch(e){}
+   const screen=document.getElementById('screen');
+   try {
+     // These two literals are rewritten by infra/Dockerfile's md5 stamping (it greps to
+     // confirm the rewrite landed, so a refactor that breaks the match fails the build).
+     const WASM_URL = 'FreeCAD.wasm?v=04875edf89b5';
+     const DATA_URL = 'FreeCAD.data.gz?v=b9fff5cab4b5';
+     let __wasmGot = 0, __dataGot = 0, __fromCache = true;
+     const __report = () => {
+       const done = __wasmGot + __dataGot, tot = NOMINAL.wasm + NOMINAL.data;
+       const pct = Math.max(1, Math.min(99, Math.floor(100 * done / tot)));
+       if (__fromCache) { __setBoot('Loading from local cache…'); }
+       else { __setBoot('Downloading… ' + pct + '%'); }
+     };
+     // Fetch the wasm bytes up front so the PyEM_CountArgs parser (pre-gui.js)
+     // can read Module.wasmBinary and force CPython's direct-call trampoline
+     // (no JS frame) — required for JSPI to suspend across CPython frames.
+     let __fcWasmBytes, __fcDataBytes;
+     try {
+       __fcWasmBytes = await __engineFetch(WASM_URL, 'wasm', (n,_t,cached) => {
+         __wasmGot = n; if (!cached) __fromCache = false; __report(); });
+       // Prefetch the package too, and hand it to emscripten via getPreloadedPackage
+       // below. Doing it here rather than letting the Module fetch it is what makes it
+       // cacheable at all -- and it is a documented emscripten hook, so no relink and no
+       // patching of the generated FreeCAD.js.
+       __fcDataBytes = await __engineFetch(DATA_URL, 'data', (n,_t,cached) => {
+         __dataGot = n; if (!cached) __fromCache = false; __report(); });
+     } catch(e){ append('engine prefetch failed: '+e,'err'); }
+     // Drop any build's entries but this one's, so the cache does not accumulate a
+     // 400 MB engine per release.
+     try {
+       const c = await __engineCache();
+       if (c) { const keep = [WASM_URL, DATA_URL].map(u => new URL(u, location.href).href);
+         for (const req of await c.keys()) { if (keep.indexOf(req.url) < 0) { await c.delete(req); } } }
+     } catch(e){}
+     const instance = window.fcInstance = await qtLoad({
+       wasmBinary: __fcWasmBytes,
+       // Hand emscripten the package we already fetched (and cached). Returning null
+       // makes it fall back to fetching the URL itself, so a prefetch failure degrades
+       // to the old behaviour instead of breaking boot.
+       // ... but only if it is the package THIS build asked for. emscripten passes the
+       // size it expects; the cache is keyed on the URL alone, so an engine whose URL did
+       // not change (a deploy that missed the ?v= stamping, or any unstamped tree) reads
+       // the previous build's package and boots with mismatched offsets. What the user
+       // sees is "Fatal Python error: Failed to import encodings module" -- an empty
+       // filesystem, from a cache hit. Measured: the upgrade gate reproduced it 3 times
+       // in 4. On a mismatch, throw the cache away and let emscripten fetch.
+       getPreloadedPackage: (name, size) => {
+         if (__fcDataBytes && size && __fcDataBytes.byteLength !== size) {
+           append('cached data package is ' + __fcDataBytes.byteLength + ' bytes but this '
+                  + 'engine wants ' + size + ' -- discarding the engine cache', 'err');
+           try { caches.delete(ENGINE_CACHE); } catch(e){}
+           __fcDataBytes = null;
+           return null;
+         }
+         return __fcDataBytes || null;
+       },
+       // ?v= is not cosmetic: Cloudflare had already cached /FreeCAD.data.gz from a
+       // probe made BEFORE nginx served it with Content-Encoding, and that entry would
+       // hand the browser raw gzip bytes. A new query string is a new cache object, so
+       // this cannot collide with anything cached earlier. Bump it if the file changes
+       // in a way the immutable Cache-Control would otherwise hide.
+       locateFile: (f) => (f === 'FreeCAD.data' ? DATA_URL : f),
+       // emscripten Module config merged by qtLoad:
+       print:(t)=>append(t), printErr:(t)=>append(t,'err'),
+       setStatus:(t)=>{ if(!t) return; append('[status] '+t);
+         // Friendly loading-overlay text (no raw byte counts / spam).
+         const m=/\((\d+)\/(\d+)\)/.exec(t);
+         if(/Downloading/.test(t)){ __setBoot(m?('Downloading… '+Math.floor(100*(+m[1])/(+m[2]))+'%'):'Downloading… (first load ~115 MB)'); }
+         else if(/Running/.test(t)){ __setBoot('Starting FreeCAD…'); } },
+       monitorRunDependencies:(n)=>{ append('[deps] remaining='+n);
+         if(n>0) __setBoot('Unpacking application data… ('+n+' left)'); },
+       onAbort:(w)=>{ append('[ABORT] '+w,'err');
+         // An out-of-memory abort is not a bug report, it is a limit the user can
+         // work around, so it gets its own wording rather than 'something went wrong'.
+         try {
+           if (/memory|OOM/i.test(String(w))) {
+             window.fcwebNotify && window.fcwebNotify(
+               'Out of memory: this model is larger than the browser build can hold ' +
+               '(2 GB limit). Your work has been autosaved — reload to get it back.', 'error');
+           } else if (window.fcwebCrash) { window.fcwebCrash('wasm abort', w); }
+           // Only the KIND, never the message -- an abort string can contain paths.
+           try { window.fcwebEvent('abort', /memory|OOM/i.test(String(w)) ? 'oom' : 'other'); } catch(e){}
+           // A non-OOM abort can mean a bad cached engine, and a bad cached entry is
+           // sticky: it would be served again on every reload, so the app would be
+           // permanently broken for that user with no way out from inside the page.
+           // Offer the way out. Only on real aborts, so it is never ordinary UI.
+           if (!/memory|OOM/i.test(String(w))) { __offerCacheReset(); }
+         } catch(e){} },
+       qt: {
+         onLoaded: () => { const st=document.getElementById('status'); if(st) st.textContent='FreeCAD loaded';
+           // The ONLY point at which it is safe to call into CPython from JS. Every gate
+           // below used to ask whether _fcweb_run_python EXISTS, which is true the moment
+           // the module instantiates -- long before main() has initialised the interpreter.
+           // A poller that fired in that window re-entered Python and killed the app with
+           // "Fatal Python error: _PyThreadState_Attach: non-NULL old thread state" while
+           // the runtime was still 'preinitialized'. Qt fires onLoaded once the app is up,
+           // so this flag is the real readiness signal.
+           window.__fcAppReady = true;
+           // App is up: reveal the full-window FreeCAD UI and drop the loader.
+           __setBoot('Ready'); __hideBoot();
+           // Time to Ready, and whether the engine came from cache. Together these
+           // say whether the caching work actually helps real visitors, which no
+           // amount of local measurement can.
+           try { window.fcwebEvent('boot_ready', __fromCache ? 'cache' : 'network',
+                                   performance.now()); } catch(e){}
+           try { window.dispatchEvent(new Event('resize')); } catch(e){}
+           // FCWEB: warm up the PySide/Shiboken wrapper machinery right after
+           // boot. If the FIRST Qt-object wrap in a session happens lazily in
+           // the middle of widget construction (e.g. DraftToolBar.__init__),
+           // the just-created C++ widget gets collected during the nested
+           // PySide6 module import and its wrapper is invalidated. Importing
+           // the bindings + wrapping the main window once up-front makes all
+           // later wraps stable.
+           // The warmup also installs the wasm dialog shim (base64 payload below,
+           // appended to the same exec). SOURCE OF TRUTH: play-gui/wasm_dialog_shim.py
+           // — after editing it, regenerate the payload with:
+           //   base64 -i play-gui/wasm_dialog_shim.py | tr -d '\n'
+           // and replace the string inside _b64.b64decode('...'). It makes
+           // Python-triggered modal dialogs non-blocking so they don't asyncify-
+           // suspend across the CPython stack (which crashes the instance).
+           try { setTimeout(function(){
+             var m=window.fcInstance; if(!m) return;
+             var code="import shiboken6, sys\nimport PySide6.QtCore, PySide6.QtGui, PySide6.QtWidgets\nimport FreeCADGui\n# Pin the MainWindow wrapper for the app lifetime: shiboken parents runtime\n# widgets (addToolBar etc.) to this wrapper, and if it gets GC'd the children's\n# wrappers are cascade-invalidated even though the C++ objects live on.\nsys._fcweb_mw = FreeCADGui.getMainWindow()\nprint('[fcweb] mw wrapper singleton:', sys._fcweb_mw is FreeCADGui.getMainWindow())\nprint('[fcweb] pyside warmup done')";
+             if(window.FC_JSPI){ code += "\nimport base64 as _b64; exec(compile(_b64.b64decode('IyBTUERYLUxpY2Vuc2UtSWRlbnRpZmllcjogTEdQTC0yLjEtb3ItbGF0ZXIKIyBDb3B5cmlnaHQgKGMpIFZpcnRhc3RpYwojIEZyZWVDQUQtV2ViIEpTUEkgYnVpbGQ6IHJvdXRlIFB5dGhvbi10cmlnZ2VyZWQgbW9kYWwgZGlhbG9ncyB0aHJvdWdoIGEgQkxPQ0tJTkcKIyBIVE1MIG1vZGFsIChfZmN3ZWJkbGcuY29uZmlybSkgdGhhdCByZXR1cm5zIHRoZSB1c2VyJ3MgUkVBTCBjaG9pY2UuIE5hdGl2ZSBRdAojIFFNZXNzYWdlQm94IHdpbmRvd3MgZG9uJ3QgY29tcG9zaXRlIHRoZWlyIGJvZHkvYnV0dG9ucyBvbiB0aGlzIFF0LXdhc20gYnVpbGQsCiMgc28gdGhpcyBicmlkZ2UgZGVsaXZlcnMgYWN0dWFsIHVzZXIgY2hvaWNlIHZpYSB0aGUgSlNQSSBzdXNwZW5kIGluc3RlYWQuCmltcG9ydCBzeXMKCmRlZiBpbnN0YWxsKCk6CiAgICBmcm9tIFB5U2lkZTYgaW1wb3J0IFF0V2lkZ2V0cyBhcyBXCiAgICBpbXBvcnQgX2Zjd2ViZGxnCgogICAgTUIgPSBXLlFNZXNzYWdlQm94CgogICAgIyBNYXAgYSBRTWVzc2FnZUJveC5TdGFuZGFyZEJ1dHRvbnMgZmxhZyBzZXQgdG8gYW4gb3JkZXJlZCBsaXN0IG9mIChmbGFnLCBsYWJlbCkuCiAgICBfT1JERVIgPSBbCiAgICAgICAgKE1CLk9rLCAiT0siKSwgKE1CLlllcywgIlllcyIpLCAoTUIuWWVzVG9BbGwsICJZZXMgdG8gQWxsIiksCiAgICAgICAgKE1CLk5vLCAiTm8iKSwgKE1CLk5vVG9BbGwsICJObyB0byBBbGwiKSwgKE1CLkFib3J0LCAiQWJvcnQiKSwKICAgICAgICAoTUIuUmV0cnksICJSZXRyeSIpLCAoTUIuSWdub3JlLCAiSWdub3JlIiksIChNQi5TYXZlLCAiU2F2ZSIpLAogICAgICAgIChNQi5TYXZlQWxsLCAiU2F2ZSBBbGwiKSwgKE1CLkRpc2NhcmQsICJEaXNjYXJkIiksCiAgICAgICAgKE1CLkFwcGx5LCAiQXBwbHkiKSwgKE1CLlJlc2V0LCAiUmVzZXQiKSwgKE1CLkNsb3NlLCAiQ2xvc2UiKSwKICAgICAgICAoTUIuQ2FuY2VsLCAiQ2FuY2VsIiksCiAgICBdCgogICAgZGVmIF9idXR0b25zX2ZvcihmbGFncyk6CiAgICAgICAgcGFpcnMgPSBbKGYsIGxibCkgZm9yIChmLCBsYmwpIGluIF9PUkRFUiBpZiBpbnQoZmxhZ3MpICYgaW50KGYpXQogICAgICAgIGlmIG5vdCBwYWlyczoKICAgICAgICAgICAgcGFpcnMgPSBbKE1CLk9rLCAiT0siKV0KICAgICAgICByZXR1cm4gcGFpcnMKCiAgICBkZWYgX2Fzayh0aXRsZSwgdGV4dCwgZmxhZ3MpOgogICAgICAgIHBhaXJzID0gX2J1dHRvbnNfZm9yKGZsYWdzKQogICAgICAgIGxhYmVscyA9IFtsYmwgZm9yIChfZiwgbGJsKSBpbiBwYWlyc10KICAgICAgICBpZHggPSBfZmN3ZWJkbGcuY29uZmlybShzdHIodGl0bGUgb3IgIkZyZWVDQUQiKSwgc3RyKHRleHQgb3IgIiIpLCBsYWJlbHMpCiAgICAgICAgaWYgaWR4IDwgMCBvciBpZHggPj0gbGVuKHBhaXJzKToKICAgICAgICAgICAgaWR4ID0gMAogICAgICAgIHJldHVybiBwYWlyc1tpZHhdWzBdCgogICAgZGVmIF9tYWtlX3N0YXRpYyhkZWZhdWx0X2ZsYWdzKToKICAgICAgICBkZWYgX2YoKmEsICoqayk6CiAgICAgICAgICAgIHBhcmVudCA9IGFbMF0gaWYgbGVuKGEpID4gMCBlbHNlIGsuZ2V0KCJwYXJlbnQiKQogICAgICAgICAgICB0aXRsZSAgPSBhWzFdIGlmIGxlbihhKSA+IDEgZWxzZSBrLmdldCgidGl0bGUiLCAiIikKICAgICAgICAgICAgYm9keSAgID0gYVsyXSBpZiBsZW4oYSkgPiAyIGVsc2Ugay5nZXQoInRleHQiLCAiIikKICAgICAgICAgICAgZmxhZ3MgID0gYVszXSBpZiBsZW4oYSkgPiAzIGVsc2Ugay5nZXQoImJ1dHRvbnMiLCBkZWZhdWx0X2ZsYWdzKQogICAgICAgICAgICByZXR1cm4gX2Fzayh0aXRsZSwgYm9keSwgZmxhZ3MpCiAgICAgICAgcmV0dXJuIHN0YXRpY21ldGhvZChfZikKCiAgICBNQi5xdWVzdGlvbiAgICA9IF9tYWtlX3N0YXRpYyhNQi5ZZXMgfCBNQi5ObykKICAgIE1CLmluZm9ybWF0aW9uID0gX21ha2Vfc3RhdGljKE1CLk9rKQogICAgTUIud2FybmluZyAgICAgPSBfbWFrZV9zdGF0aWMoTUIuT2spCiAgICBNQi5jcml0aWNhbCAgICA9IF9tYWtlX3N0YXRpYyhNQi5PaykKCiAgICAjIGluc3RhbmNlIC5leGVjKCkvLmV4ZWNfKCkgb24gUU1lc3NhZ2VCb3ggLT4gYmxvY2tpbmcgSFRNTCB3aXRoIGl0cyBvd24gYnV0dG9ucwogICAgZGVmIF9tYl9leGVjKHNlbGYsICphLCAqKmspOgogICAgICAgIHRyeToKICAgICAgICAgICAgZmxhZ3MgPSBzZWxmLnN0YW5kYXJkQnV0dG9ucygpCiAgICAgICAgICAgIHJldHVybiBfYXNrKHNlbGYud2luZG93VGl0bGUoKSwgc2VsZi50ZXh0KCksIGZsYWdzKQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgICAgIHJldHVybiBNQi5PawogICAgTUIuZXhlYyA9IF9tYl9leGVjCiAgICBNQi5leGVjXyA9IF9tYl9leGVjCgogICAgIyBRSW5wdXREaWFsb2cgaXMgZGVsaWJlcmF0ZWx5IE5PVCBzdHViYmVkLgogICAgIwogICAgIyBJdCB1c2VkIHRvIGJlLCByZXR1cm5pbmcgKHZhbHVlLCBGYWxzZSkgLS0gaS5lLiAidGhlIHVzZXIgY2FuY2VsbGVkIiAtLSBmb3IgZ2V0VGV4dCwKICAgICMgZ2V0SXRlbSwgZ2V0SW50IGFuZCBnZXREb3VibGUuIFRoYXQgc2lsZW50bHkgYnJva2UgZXZlcnkgbWFjcm8gYW5kIFB5dGhvbi13b3JrYmVuY2gKICAgICMgY29tbWFuZCB0aGF0IGFza3MgZm9yIGEgbmFtZSwgYSBjb3VudCBvciBhIGxlbmd0aDogdGhleSB0b29rIHRoZSBjYW5jZWwgYnJhbmNoIGFuZAogICAgIyBxdWlldGx5IGRpZCBub3RoaW5nLgogICAgIwogICAgIyBUaGUgc3RhdGVkIHJlYXNvbiB3YXMgdGhhdCBuYXRpdmUgUXQgZGlhbG9ncyAiZG9uJ3QgY29tcG9zaXRlIHRoZWlyIGJvZHkvYnV0dG9ucyIgb24KICAgICMgdGhpcyBRdC13YXNtIGJ1aWxkLiBUaGF0IGlzIG5vIGxvbmdlciB0cnVlLCBhbmQgd2FzIG1lYXN1cmVkIG9uIHByb2R1Y3Rpb24gYmVmb3JlCiAgICAjIHJlbW92aW5nIHRoaXM6IGEgbmF0aXZlIFFJbnB1dERpYWxvZyBjb25zdHJ1Y3RlZCBhbmQgc2hvd24gcmVwb3J0cwogICAgIyB2aXNpYmxlPVRydWUgc2l6ZT0yMDh4MTA5IGNoaWxkcmVuPTQgd2l0aCByZWFsIGdlb21ldHJ5LiBRTWVzc2FnZUJveCBsaWtld2lzZSAtLQogICAgIyBzY3JhdGNocGFkL3JlZy1wcm9kLmpzIGNsaWNrcyBhIG5hdGl2ZSBvbmUgYXQgcmVhbCBwaXhlbHMgYW5kIHJlcXVpcmVzIHRoZSByZWFsCiAgICAjIHJldHVybiB2YWx1ZSAoMTYzODQpLCBhbmQgZGxnc3VpdGUuanMgb3BlbnMgUHJlZmVyZW5jZXMgd2l0aCAxNjMxIHdpZGdldHMuCiAgICAjCiAgICAjIFRoZSBibG9ja2luZyBleGVjKCkgdGhlc2Ugc3RhdGljcyBwZXJmb3JtIHN1c3BlbmRzIGNvcnJlY3RseSBiZWNhdXNlCiAgICAjIF9mY3dlYl9ydW5fcHl0aG9uIGlzIGluIEFTWU5DSUZZX0VYUE9SVFMsIHdoaWNoIGlzIHRoZSBzYW1lIG1lY2hhbmlzbSB0aGUgUU1lc3NhZ2VCb3gKICAgICMgYnJpZGdlIGFib3ZlIHJlbGllcyBvbi4KICAgICMKICAgICMgTk9URSB0aGUgc3R1YnMgY291bGQgbm90IHNpbXBseSBiZSBkZWxldGVkIGF0IHJ1bnRpbWUgdG8gdGVzdCB0aGlzOiBTaGlib2tlbiB0eXBlcwogICAgIyByYWlzZSBBdHRyaWJ1dGVFcnJvciBvbiBgZGVsYCwgc28gdGhlIG5hdGl2ZXMgYXJlIHVucmVjb3ZlcmFibGUgb25jZSBvdmVyd3JpdHRlbi4KICAgICMgVGhhdCBpcyB3aHkgdGhpcyBpcyBhIHNvdXJjZSBjaGFuZ2UgcmF0aGVyIHRoYW4gYSBwcm9iZS4KCnRyeToKICAgIGluc3RhbGwoKQogICAgcHJpbnQoIltmY3dlYl0gSlNQSSBibG9ja2luZy1kaWFsb2cgYnJpZGdlIGluc3RhbGxlZCIpCmV4Y2VwdCBFeGNlcHRpb24gYXMgX2U6CiAgICBwcmludCgiW2Zjd2ViXSBKU1BJIGRpYWxvZyBicmlkZ2UgRkFJTEVEOiIsIF9lKQo=').decode(), 'wasm_dialog_jspi', 'exec'))"; }
+             if(!window.FC_JSPI){ code += "\nimport base64 as _b64\ntry:\n exec(compile(_b64.b64decode('IyBTUERYLUxpY2Vuc2UtSWRlbnRpZmllcjogTEdQTC0yLjEtb3ItbGF0ZXIKIyBDb3B5cmlnaHQgKGMpIFZpcnRhc3RpYwojIEZyZWVDQUQtV0FTTTogbWFrZSBQeXRob24tdHJpZ2dlcmVkIG1vZGFsIGRpYWxvZ3Mgc2FmZSB1bmRlciBFbXNjcmlwdGVuIEFzeW5jaWZ5LgojCiMgV2h5OiBvbiB0aGUgd2FzbSBidWlsZCAoUXQtZm9yLVdlYkFzc2VtYmx5ICsgLXNBU1lOQ0lGWSksIGEgbW9kYWwgUURpYWxvZy8KIyBRTWVzc2FnZUJveCBleGVjKCkgc3RhcnRlZCBmcm9tIFB5dGhvbiBtdXN0IGFzeW5jaWZ5LXN1c3BlbmQgYWNyb3NzIHRoZSBDUHl0aG9uCiMgaW50ZXJwcmV0ZXIncyBDIHN0YWNrIGZyYW1lLiBDUHl0aG9uIGtlZXBzIGl0cyBmcmFtZSBzdGF0ZSBpbiB0aHJlYWQtc3RhdGUKIyBnbG9iYWxzIHRoYXQgYXN5bmNpZnkncyBsb2NhbCBzYXZlL3Jlc3RvcmUgZG9lcyBub3QgY2FwdHVyZSwgc28gdGhlIHN1c3BlbmQKIyBjb3JydXB0cyB0aGUgaW50ZXJwcmV0ZXIgLT4gIlJ1bnRpbWVFcnJvcjogdW5yZWFjaGFibGUiIC8gbnVsbC1mdW5jdGlvbiB0cmFwcwojIHRoYXQga2lsbCB0aGUgd2hvbGUgaW5zdGFuY2UuIChDKystdHJpZ2dlcmVkIGRpYWxvZ3MgaGF2ZSBubyBQeXRob24gZnJhbWUgb24gdGhlCiMgc3RhY2sgYW5kIHdvcmsgZmluZTsgdGhpcyBvbmx5IGFmZmVjdHMgbWFjcm9zIGFuZCBQeXRob24td29ya2JlbmNoIGRpYWxvZ3MuKQojCiMgQSBibG9ja2luZyBleGVjKCkgdGhhdCByZXR1cm5zIHRoZSB1c2VyJ3MgcmVhbCBjaG9pY2UgaXMgdGhlcmVmb3JlIGltcG9zc2libGUgaW4KIyB0aGlzIGFyY2hpdGVjdHVyZS4gVGhpcyBzaGltIGRlZ3JhZGVzIGdyYWNlZnVsbHkgaW5zdGVhZCBvZiBjcmFzaGluZzogdGhlIGRpYWxvZwojIGlzIHNob3duIE5PTi1ibG9ja2luZyAoc2hvdygpLCBub3QgZXhlYygpKSBhbmQgdGhlIGNhbGwgcmV0dXJucyBhIHNhZmUgZGVmYXVsdAojIGltbWVkaWF0ZWx5IChOb0J1dHRvbiAvIFJlamVjdGVkIC8gKHZhbHVlLCBGYWxzZSkpIHNvIHRoZSBtYWNybyBrZWVwcyBydW5uaW5nIGFuZAojIGZhaWxzIHRvd2FyZCAiY2FuY2VsIC8gbm8gY2hhbmdlIi4gVGhlIGRpYWxvZyBzdGF5cyBvbiBzY3JlZW4gYW5kIGludGVyYWN0aXZlLgojCiMgTG9hZGVkIG9uY2UgYXQgYm9vdCBmcm9tIHRoZSB3YXNtIGhhcm5lc3MgKGZyZWVjYWQtZ3VpLmh0bWwpLCBhZnRlciBQeVNpZGU2IGlzCiMgaW1wb3J0ZWQuIEltcG9ydC1ndWFyZGVkIHNvIGEgbWlzc2luZy9yZW5hbWVkIEFQSSBuZXZlciBhYm9ydHMgYm9vdC4KCmltcG9ydCBzeXMKCgpkZWYgaW5zdGFsbCgpOgogICAgZnJvbSBQeVNpZGU2IGltcG9ydCBRdFdpZGdldHMgYXMgVywgUXRDb3JlIGFzIEMsIFF0R3VpIGFzIEcKCiAgICBOQiA9IDAgICMgUU1lc3NhZ2VCb3guTm9CdXR0b24gPT0gUURpYWxvZy5SZWplY3RlZCA9PSAwIC0+IHNhZmUgIm5vIGNob2ljZSIKCiAgICAjIC0tLS0gaW5zdGFuY2UgLmV4ZWMgLyAuZXhlY18gOiBRRGlhbG9nIHN1YmNsYXNzZXMsIFFNZXNzYWdlQm94KCksIFFJbnB1dERpYWxvZygpCiAgICBkZWYgX2V4ZWMoc2VsZiwgKmEsICoqayk6CiAgICAgICAgdHJ5OgogICAgICAgICAgICBzZWxmLnNldFdpbmRvd01vZGFsaXR5KEMuUXQuTm9uTW9kYWwpCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICAgICAgcGFzcwogICAgICAgIHNlbGYuc2hvdygpCiAgICAgICAgdHJ5OgogICAgICAgICAgICBzZWxmLnJhaXNlXygpCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICAgICAgcGFzcwogICAgICAgIHJldHVybiBOQgoKICAgIGZvciBjbHMgaW4gKFcuUURpYWxvZywgVy5RTWVzc2FnZUJveCwgVy5RSW5wdXREaWFsb2cpOgogICAgICAgIGNscy5leGVjID0gX2V4ZWMKICAgICAgICBjbHMuZXhlY18gPSBfZXhlYwoKICAgICMgLS0tLSBzdGF0aWMgUU1lc3NhZ2VCb3gucXVlc3Rpb24gLyBpbmZvcm1hdGlvbiAvIHdhcm5pbmcgLyBjcml0aWNhbAogICAgZGVmIF9tYWtlX21zZ2JveF9zdGF0aWMoZGVmYXVsdF9idXR0b25zKToKICAgICAgICBkZWYgX2YoKmEsICoqayk6CiAgICAgICAgICAgIHBhcmVudCA9IGFbMF0gaWYgbGVuKGEpID4gMCBlbHNlIGsuZ2V0KCJwYXJlbnQiKQogICAgICAgICAgICB0aXRsZSA9IGFbMV0gaWYgbGVuKGEpID4gMSBlbHNlIGsuZ2V0KCJ0aXRsZSIsICIiKQogICAgICAgICAgICB0ZXh0ID0gYVsyXSBpZiBsZW4oYSkgPiAyIGVsc2Ugay5nZXQoInRleHQiLCAiIikKICAgICAgICAgICAgYnV0dG9ucyA9IGFbM10gaWYgbGVuKGEpID4gMyBlbHNlIGsuZ2V0KCJidXR0b25zIiwgZGVmYXVsdF9idXR0b25zKQogICAgICAgICAgICBtYiA9IFcuUU1lc3NhZ2VCb3gocGFyZW50KQogICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICBtYi5zZXRXaW5kb3dUaXRsZShzdHIodGl0bGUpKQogICAgICAgICAgICAgICAgbWIuc2V0VGV4dChzdHIodGV4dCkpCiAgICAgICAgICAgICAgICBtYi5zZXRTdGFuZGFyZEJ1dHRvbnMoYnV0dG9ucykKICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICAgICAgICAgIHBhc3MKICAgICAgICAgICAgdHJ5OgogICAgICAgICAgICAgICAgbWIuc2V0V2luZG93TW9kYWxpdHkoQy5RdC5Ob25Nb2RhbCkKICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICAgICAgICAgIHBhc3MKICAgICAgICAgICAgbWIuc2hvdygpCiAgICAgICAgICAgIHJldHVybiBOQgogICAgICAgIHJldHVybiBzdGF0aWNtZXRob2QoX2YpCgogICAgVy5RTWVzc2FnZUJveC5xdWVzdGlvbiA9IF9tYWtlX21zZ2JveF9zdGF0aWMoVy5RTWVzc2FnZUJveC5ZZXMgfCBXLlFNZXNzYWdlQm94Lk5vKQogICAgVy5RTWVzc2FnZUJveC5pbmZvcm1hdGlvbiA9IF9tYWtlX21zZ2JveF9zdGF0aWMoVy5RTWVzc2FnZUJveC5PaykKICAgIFcuUU1lc3NhZ2VCb3gud2FybmluZyA9IF9tYWtlX21zZ2JveF9zdGF0aWMoVy5RTWVzc2FnZUJveC5PaykKICAgIFcuUU1lc3NhZ2VCb3guY3JpdGljYWwgPSBfbWFrZV9tc2dib3hfc3RhdGljKFcuUU1lc3NhZ2VCb3guT2spCgogICAgIyAtLS0tIHN0YXRpYyBRSW5wdXREaWFsb2cuZ2V0VGV4dCAvIGdldEl0ZW0gLyBnZXRJbnQgLyBnZXREb3VibGUgIC0+ICh2YWx1ZSwgb2s9RmFsc2UpCiAgICBXLlFJbnB1dERpYWxvZy5nZXRUZXh0ID0gc3RhdGljbWV0aG9kKGxhbWJkYSAqYSwgKiprOiAoIiIsIEZhbHNlKSkKICAgIFcuUUlucHV0RGlhbG9nLmdldE11bHRpTGluZVRleHQgPSBzdGF0aWNtZXRob2QobGFtYmRhICphLCAqKms6ICgiIiwgRmFsc2UpKQogICAgVy5RSW5wdXREaWFsb2cuZ2V0SXRlbSA9IHN0YXRpY21ldGhvZCgKICAgICAgICBsYW1iZGEgKmEsICoqazogKChhWzNdWzBdIGlmIGxlbihhKSA+IDMgYW5kIGFbM10gZWxzZSAiIiksIEZhbHNlKSkKICAgIFcuUUlucHV0RGlhbG9nLmdldEludCA9IHN0YXRpY21ldGhvZCgKICAgICAgICBsYW1iZGEgKmEsICoqazogKChhWzNdIGlmIGxlbihhKSA+IDMgZWxzZSAwKSwgRmFsc2UpKQogICAgVy5RSW5wdXREaWFsb2cuZ2V0RG91YmxlID0gc3RhdGljbWV0aG9kKAogICAgICAgIGxhbWJkYSAqYSwgKiprOiAoKGFbM10gaWYgbGVuKGEpID4gMyBlbHNlIDAuMCksIEZhbHNlKSkKCiAgICAjIC0tLS0gc3RhdGljIFFGaWxlRGlhbG9nIHBpY2tlcnMgLT4gZW1wdHkgc2VsZWN0aW9uIChtYWNyb3Mgc2hvdWxkIHByZWZlciB0aGUKICAgICMgICAgICBuYXRpdmUgRnJlZUNBRCBmaWxlIGJyaWRnZTsgYSByYXcgUUZpbGVEaWFsb2cgZnJvbSBQeXRob24gd291bGQgY3Jhc2gpLgogICAgVy5RRmlsZURpYWxvZy5nZXRPcGVuRmlsZU5hbWUgPSBzdGF0aWNtZXRob2QobGFtYmRhICphLCAqKms6ICgiIiwgIiIpKQogICAgVy5RRmlsZURpYWxvZy5nZXRPcGVuRmlsZU5hbWVzID0gc3RhdGljbWV0aG9kKGxhbWJkYSAqYSwgKiprOiAoW10sICIiKSkKICAgIFcuUUZpbGVEaWFsb2cuZ2V0U2F2ZUZpbGVOYW1lID0gc3RhdGljbWV0aG9kKGxhbWJkYSAqYSwgKiprOiAoIiIsICIiKSkKICAgIFcuUUZpbGVEaWFsb2cuZ2V0RXhpc3RpbmdEaXJlY3RvcnkgPSBzdGF0aWNtZXRob2QobGFtYmRhICphLCAqKms6ICIiKQoKICAgICMgLS0tLSBzdGF0aWMgUUNvbG9yRGlhbG9nIC8gUUZvbnREaWFsb2cgLT4gaW52YWxpZC9kZWZhdWx0ICsgb2s9RmFsc2UKICAgIFcuUUNvbG9yRGlhbG9nLmdldENvbG9yID0gc3RhdGljbWV0aG9kKGxhbWJkYSAqYSwgKiprOiBHLlFDb2xvcigpKQogICAgVy5RRm9udERpYWxvZy5nZXRGb250ID0gc3RhdGljbWV0aG9kKGxhbWJkYSAqYSwgKiprOiAoRy5RRm9udCgpLCBGYWxzZSkpCgoKdHJ5OgogICAgaW5zdGFsbCgpCiAgICBwcmludCgiW2Zjd2ViXSB3YXNtIGRpYWxvZyBzaGltIGluc3RhbGxlZCIpCmV4Y2VwdCBFeGNlcHRpb24gYXMgX2U6CiAgICBwcmludCgiW2Zjd2ViXSB3YXNtIGRpYWxvZyBzaGltIEZBSUxFRDoiLCBfZSkK').decode('utf-8'),'wasm_dialog_shim','exec'))\nexcept Exception as _e:\n print('[fcweb] dialog shim loader failed:', _e)"; }
+             var n=new TextEncoder().encode(code).length+1; var pp=m._malloc(n); m.stringToUTF8(code,pp,n);
+             try { fcRunPy(m,pp); } catch(e){ append('pyside warmup threw: '+e,'err'); }
+           }, 8000); } catch(e){}
+           // FCWEB autotest: ?autotest=1 creates a doc+box+fit automatically
+           try { if (new URLSearchParams(location.search).has('autotest')) {
+             setTimeout(function(){
+               var m=window.fcInstance; if(!m) return;
+               var code="import FreeCAD as App\nd=App.newDocument('AutoTest')\nb=d.addObject('Part::Box','Box')\nb.Length=10; b.Width=20; b.Height=30\nd.recompute()\nimport FreeCADGui as Gui\nv=Gui.ActiveDocument.ActiveView\nv.viewIsometric()\nv.fitAll()\nGui.updateGui()\nprint('CAM-ORI', ['%.3f'%x for x in v.getCameraOrientation().Q])\nprint('AUTOTEST-DONE')";
+               var n=new TextEncoder().encode(code).length+1; var pp=m._malloc(n); m.stringToUTF8(code,pp,n);
+               try { fcRunPy(m,pp); } catch(e){ append('autotest threw: '+e,'err'); }
+             }, 12000);
+           } } catch(e){}
+         },
+         onExit: (e) => append('[exit] code='+(e&&e.code)),
+         entryFunction: window.FreeCAD_entry,
+         containerElements: [screen],
+       }
+     });
+   } catch(e){ append('qtLoad failed: '+e,'err'); if(e&&e.stack) append(e.stack,'err'); }
+ }
+</script>
+<script>
+// FCWEB: the GL emulation calls enable/disable/vertexAttribPointer with
+// location -1 for attributes its generated shader doesn't use — each call spams
+// "INVALID_VALUE: index out of range". GL semantics are error+ignore, so skip
+// them silently.
+(function(){
+  ['enableVertexAttribArray','disableVertexAttribArray'].forEach(function(nm){
+    var o=WebGL2RenderingContext.prototype[nm];
+    WebGL2RenderingContext.prototype[nm]=function(i){ if(i<0||i===4294967295) return; return o.call(this,i); };
+  });
+  var vap=WebGL2RenderingContext.prototype.vertexAttribPointer;
+  WebGL2RenderingContext.prototype.vertexAttribPointer=function(i){ if(i<0||i===4294967295) return; return vap.apply(this,arguments); };
+})();
+// FCWEB PERF: during interactive redraw Coin queries FRAMEBUFFER_BINDING + VIEWPORT
+// ~29x per draw (~380k JS<->GPU round-trips per orbit) and the immediate-mode flush
+// re-binds the same shader program every batch. Those round-trips dominated the frame
+// (~17 FPS). Cache framebuffer + viewport (tracked via bindFramebuffer/viewport) and
+// skip redundant useProgram. Correct because every state change flows through these same
+// wrapped methods; per-context state lives on the context object, so context loss/reuse
+// re-initialises cleanly. Restores interactive orbit toward 30+ FPS.
+(function(){
+  var P=WebGL2RenderingContext.prototype;
+  var FB_BINDING=0x8CA6, VIEWPORT=0x0BA2, TARGET_FRAMEBUFFER=0x8D40;
+  var _gp=P.getParameter;
+  P.getParameter=function(pn){
+    if(pn===FB_BINDING && this._fcFB!==undefined) return this._fcFB;
+    if(pn===VIEWPORT && this._fcVP) return this._fcVP;
+    return _gp.apply(this,arguments);
+  };
+  var _bf=P.bindFramebuffer;
+  P.bindFramebuffer=function(target,fb){ this._fcFB=(target===TARGET_FRAMEBUFFER)?fb:undefined; return _bf.apply(this,arguments); };
+  var _vp=P.viewport;
+  P.viewport=function(x,y,w,h){ var a=this._fcVP||(this._fcVP=new Int32Array(4)); a[0]=x;a[1]=y;a[2]=w;a[3]=h; return _vp.apply(this,arguments); };
+  var _up=P.useProgram;
+  P.useProgram=function(prog){ if(this._fcProg===prog) return; this._fcProg=prog; return _up.apply(this,arguments); };
+  // Skip redundant ARRAY_BUFFER re-binds (global state, not VAO-scoped, so safe to cache).
+  var ARRAY_BUFFER=0x8892;
+  var _bb=P.bindBuffer;
+  P.bindBuffer=function(target,buf){ if(target===ARRAY_BUFFER){ if(this._fcAB===buf) return; this._fcAB=buf; } return _bb.apply(this,arguments); };
+})();
+</script>
+<script>
+// FCWEB GL tracer: wrap WebGL2 draw calls to see what actually reaches the GPU.
+//
+// OPT-IN (?gltrace=1). It used to run for every user, and it is not free: it wraps every
+// drawArrays/drawElements and, for the first 400, issues synchronous getParameter /
+// isEnabled reads. Those flush the GL pipeline, on a renderer that is already draw-call
+// bound at ~11 fps on a heavy scene -- so the diagnostic was taxing the exact thing it
+// exists to diagnose, and retaining 400 records with shader and uniform dumps besides.
+//
+// The render-debug switches below (?nodepth, ?nocull, ?darkbg) live in the same block and
+// are gated on ?dev=1. They are support surface, not security: a user who lands on a
+// shared link carrying ?skipCoin or ?nodepth files a bug nobody can reproduce.
+//
+// DO NOT early-return out of this IIFE to disable the tracer. It is not a tracer block --
+// it continues on to the 3D overlay compositor, the memory-pressure monitor and
+// fcwebHeapUsedMB, and the autosave install/restore poll. Returning here silently disabled
+// ALL of that: no memory warning, and no autosave, so a user's work was never written and
+// nothing said so. Gate the individual features (as the `if (__trace)` around the wrap()
+// calls below does) and leave the IIFE itself to run to the end.
+(function(){
+  var __qs = location.search;
+  var __trace = /[?&]gltrace=1/.test(__qs);
+  var __dev   = /[?&]dev=1/.test(__qs);
+  if (__trace) { window.__gllog = []; }
+
+  // OPT-IN (?pixelgate=1): keep the drawing buffer so the frame can be READ BACK.
+  //
+  // Rendering has never been gated, and the stated reason -- that a headless run cannot
+  // judge it -- turned out to be wrong twice over. requestAnimationFrame does fire
+  // headless (measured: 179 ticks in 3 s) and Chromium's SwiftShader gives a real WebGL2
+  // context. What actually defeated every attempt is this: the context is created without
+  // preserveDrawingBuffer, so the buffer is undefined once the frame composites, and both
+  // a screenshot and a drawImage read back pure black while the app is drawing perfectly
+  // well -- 399 draw calls, 20 of them in the main viewport, all traced.
+  //
+  // preserveDrawingBuffer costs real performance, so users must never get it. Behind a
+  // flag it makes the viewport measurable, which is the whole of RELEASE-PLAN V6.
+  if (/[?&]pixelgate=1/.test(__qs)) {
+    var __getctx = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function(type, attrs){
+      if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+        attrs = Object.assign({}, attrs || {}, { preserveDrawingBuffer: true });
+      }
+      return __getctx.call(this, type, attrs);
+    };
+    // Coin renders into its OWN offscreen FBO (window.__fcCoinFbo names its GL id) and the
+    // C++ blits that into Qt's backing FBO, so the canvas default framebuffer is black by
+    // construction -- which is why every capture attempt read black while the tracer showed
+    // 399 draws. Reading the right buffer needs the WebGLFramebuffer OBJECT, and an id
+    // cannot be turned into one from JS: emscripten's GL.framebuffers map is not exported.
+    // So record the object as it is bound. Same trick the compositor's own shadow uses.
+    ['WebGL2RenderingContext', 'WebGLRenderingContext'].forEach(function(n){
+      if (!window[n]) { return; }
+      var P = window[n].prototype, orig = P.bindFramebuffer;
+      P.bindFramebuffer = function(target, fb){
+        if (fb) {
+          window.__fcPixelFbo = fb; window.__fcPixelGl = this;
+          // EVERY distinct one, not just the last: the last bound is usually Qt's UI
+          // buffer, and the scene is in one of the others. A handful exist, so a list
+          // is cheap and lets a gate find the one with the picture in it.
+          var all = (window.__fcPixelFbos = window.__fcPixelFbos || []);
+          if (all.indexOf(fb) < 0 && all.length < 16) { all.push(fb); }
+        }
+        return orig.apply(this, arguments);
+      };
+    });
+    window.__fcPixelGate = true;
+  }
+  function wrap(proto, name){
+    var orig = proto[name];
+    proto[name] = function(){
+      if (window.__gllog.length < 400) {
+        var prog = this.getParameter(this.CURRENT_PROGRAM);
+        var vp = this.getParameter(this.VIEWPORT);
+        var rec = { fn:name, args:Array.prototype.slice.call(arguments,0,5),
+          prog: prog? (prog.__fcid || (prog.__fcid = ++window.__progn||(window.__progn=1))) : 0,
+          depth: this.isEnabled(this.DEPTH_TEST), vp: vp && Array.prototype.slice.call(vp) };
+        // For the box face draw (TRIANGLES, big count, main viewport) capture MVP uniforms
+        if (name==='drawArrays' && arguments[0]===4 && arguments[2]>=24 && vp && vp[2]>400 && prog && !window.__mvpDumped) {
+          window.__mvpDumped = true;
+          try {
+            var gl=this, dump={};
+            var n=gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS);
+            for (var i=0;i<n;i++){ var u=gl.getActiveUniform(prog,i); { var loc=gl.getUniformLocation(prog,u.name); var val=gl.getUniform(prog,loc); dump[u.name]= (val&&val.length!==undefined)?Array.prototype.slice.call(val):val; } }
+            var a0 = { enabled: gl.getVertexAttrib(0, gl.VERTEX_ATTRIB_ARRAY_ENABLED),
+              size: gl.getVertexAttrib(0, gl.VERTEX_ATTRIB_ARRAY_SIZE),
+              type: gl.getVertexAttrib(0, gl.VERTEX_ATTRIB_ARRAY_TYPE),
+              stride: gl.getVertexAttrib(0, gl.VERTEX_ATTRIB_ARRAY_STRIDE),
+              bufBound: !!gl.getVertexAttrib(0, gl.VERTEX_ATTRIB_ARRAY_BUFFER_BINDING) };
+            // read back a few vertices from the bound array buffer
+            var buf = gl.getVertexAttrib(0, gl.VERTEX_ATTRIB_ARRAY_BUFFER_BINDING);
+            var verts=null;
+            if (buf) { gl.bindBuffer(gl.ARRAY_BUFFER, buf); var out=new Float32Array(12); try{ gl.getBufferSubData(gl.ARRAY_BUFFER,0,out); verts=Array.prototype.slice.call(out);}catch(e){verts='readfail:'+e;} }
+            // enumerate ALL attributes by name + their pointer/offset
+            var attrs=[]; var na=gl.getProgramParameter(prog, gl.ACTIVE_ATTRIBUTES);
+            for (var ai=0; ai<na; ai++){ var inf=gl.getActiveAttrib(prog,ai); var loc=gl.getAttribLocation(prog,inf.name);
+              attrs.push({ name:inf.name, loc:loc,
+                enabled: gl.getVertexAttrib(loc, gl.VERTEX_ATTRIB_ARRAY_ENABLED),
+                size: gl.getVertexAttrib(loc, gl.VERTEX_ATTRIB_ARRAY_SIZE),
+                stride: gl.getVertexAttrib(loc, gl.VERTEX_ATTRIB_ARRAY_STRIDE),
+                offset: gl.getVertexAttribOffset(loc, gl.VERTEX_ATTRIB_ARRAY_POINTER) }); }
+            var shaders = gl.getAttachedShaders(prog).map(function(sh){ return { type: gl.getShaderParameter(sh, gl.SHADER_TYPE)===gl.VERTEX_SHADER?'VS':'FS', src: gl.getShaderSource(sh) }; });
+            window.__mvp = { count:arguments[2], vp:Array.prototype.slice.call(vp), uniforms:dump, attribs:attrs, firstVerts:verts, shaders:shaders };
+          } catch(e){ window.__mvp={err:String(e)}; }
+        }
+        window.__gllog.push(rec);
+      }
+      return orig.apply(this, arguments);
+    };
+  }
+  try {
+    if (__trace) {
+      wrap(WebGL2RenderingContext.prototype, 'drawElements');
+      wrap(WebGL2RenderingContext.prototype, 'drawArrays');
+    }
+    var qp = __dev ? new URLSearchParams(location.search) : new URLSearchParams('');
+    if (qp.has('nodepth') || qp.has('nocull')) {
+      var _en = WebGL2RenderingContext.prototype.enable;
+      WebGL2RenderingContext.prototype.enable = function(cap){
+        if (qp.has('nodepth') && cap === 0x0B71) return;  // DEPTH_TEST
+        if (qp.has('nocull') && cap === 0x0B44) return;    // CULL_FACE
+        return _en.call(this, cap); };
+    }
+    if (qp.has('darkbg')) {
+      var _cc = WebGL2RenderingContext.prototype.clearColor;
+      WebGL2RenderingContext.prototype.clearColor = function(){ return _cc.call(this, 0.05, 0.05, 0.15, 1); };
+    }
+  } catch(e){}
+
+  // FCWEB 3D-overlay compositor: Qt-wasm won't blit Coin's render to the page.
+  // So we read Coin's pixels from the default framebuffer (Coin renders to FBO 0
+  // via the wasm patch) and paint them onto our own overlay <canvas> that sits
+  // above the Qt canvas — completely outside Qt's (broken) compositor.
+  (function(){
+    var qp = new URLSearchParams(location.search);
+    // The 3D overlay compositor activates whenever 3D rendering is on.
+    // ?no3d must switch OFF the compositor and nothing else. It used to `return` from
+    // this IIFE -- which by then also contained runPy, the memory-pressure monitor and
+    // the autosave install/restore poll, so ?no3d silently disabled AUTOSAVE. That is
+    // the very failure the comment above this IIFE warns about, one level deeper, and it
+    // was measured: with ?no3d the observer never installs and .fcweb-autosave is never
+    // created; without it the observer reports installed in 13 s.
+    (function(){          // compositor only -- do not put durability code in here
+    if (qp.has('no3d')) return;  // compositor on by default with the 3D pipeline
+    var ov, ovctx, buf, imgData, lastW=0, lastH=0, throttle=0;
+    // Publish the 3D widget's on-screen rect (CSS px, relative to the main window)
+    // from Qt — only Qt knows the MDI/dock layout. Printed to stderr as "FCRECT {…}"
+    // and captured by append(). Polled because docks/resizes move it.
+    // NOTE: write to sys.__stderr__ (raw fd 2 -> emscripten printErr -> our append
+    // hook), NOT sys.stderr — FreeCAD redirects sys.stderr into the in-app Report
+    // view, which would spam it red. Dedupe: only emit when the rect changes.
+    var RECT_PY = [
+      "try:",
+      " from PySide2 import QtWidgets, QtCore",
+      "except Exception:",
+      " from PySide6 import QtWidgets, QtCore",
+      "import FreeCAD as _f, FreeCADGui as _g, json as _j, sys as _s",
+      "_mw=_g.getMainWindow()",
+      // Browser app: Qt-wasm draws a vestigial window title bar (dark, near-unreadable
+      // title text) with min/max/close buttons that do nothing in a tab AND overlap our
+      // UI. showFullScreen() drops the frame so the app fills the viewport cleanly. Once.
+      "if _mw is not None and not getattr(_f,'_fcweb_fs_done',False):",
+      " _mw.showFullScreen(); _f._fcweb_fs_done=True",
+      // Default ShapeString/annotation font. On desktop the user browses their system fonts;
+      // in a tab there is no host filesystem, so an unset FontFile leaves Draft ShapeString
+      // (and anything else asking for a font path) dead on arrival. Point it at a font we
+      // actually ship. Only set it if empty, so a user's own choice is never overwritten.
+      "try:",
+      " import os as _os",
+      " _fp=_f.ParamGet('User parameter:BaseApp/Preferences/Mod/Draft')",
+      " if not _fp.GetString('FontFile',''):",
+      "  _fd=_os.path.join(_f.getResourceDir(),'Mod','TechDraw','Resources','fonts','osifont-lgpl3fe.ttf')",
+      "  if _os.path.exists(_fd): _fp.SetString('FontFile',_fd)",
+      "except Exception: pass",
+      // Navigation cube: now renders natively. NaviCube.cpp's client-array draws
+      // (glVertexPointer+glDrawArrays) don't work under emscripten LEGACY_GL_EMULATION
+      // (the enabled-array count never sticks -> raw no-program path -> nothing drawn),
+      // so they were converted to immediate mode (glBegin/glEnd) on wasm, and the 3D
+      // viewport composites natively into the Qt canvas — so keep the cube ON (1:1).
+      "try:",
+      " _vp=_f.ParamGet('User parameter:BaseApp/Preferences/View')",
+      " _vp.SetBool('ShowNaviCube',True)",
+      "except Exception: pass",
+      // BIM workbench: its Activated() shows a first-run 'BIM_Welcome' dialog when
+      // FirstTime=True, and modal dialogs need ASYNCIFY (absent) -> emscripten_sleep
+      // abort on activation. Mark it seen so BIM activates cleanly.
+      // Navigation style. FreeCAD's default (CAD) binds rotate to a two-button chord and
+      // pan to the middle button -- neither of which a laptop trackpad can produce, so on
+      // the web the default leaves a user able to zoom and select but never to turn the
+      // model around. Gesture navigation rotates on a plain left-drag (verified against the
+      // camera, scratchpad/navstyles.js) and still selects on a click. Only set when the
+      // user has not chosen one: the value persists in the IDBFS home, so an explicit
+      // choice must survive the next boot.
+      // FreeCAD writes 'Gui::CADNavigationStyle' into the user parameters itself, so
+      // "only set when unset" never fires -- apply it once and record that, which leaves
+      // a user who later picks a different style alone on every subsequent boot.
+      "try:",
+      " _vp=_f.ParamGet('User parameter:BaseApp/Preferences/View')",
+      " if not _vp.GetBool('_fcwebNavDefault',False):",
+      "  _vp.SetString('NavigationStyle','Gui::GestureNavigationStyle')",
+      "  _vp.SetBool('_fcwebNavDefault',True)",
+      "except Exception: pass",
+      "try:",
+      " _f.ParamGet('User parameter:BaseApp/Preferences/Mod/BIM').SetBool('FirstTime',False)",
+      "except Exception: pass",
+      // DXF import/export: importDXF.readPreferences() calls FreeCADGui.showPreferences()
+      // (a modal C++ preferences dialog) when the Draft 'dxfShowDialog' pref is unset —
+      // and its draftutils default is True. A C++ QDialog::exec() launched from the Python
+      // call stack traps (asyncify can't unwind across the CPython interpreter frame), which
+      // crashed every DXF read/write. Pin it False so DXF just uses the current settings.
+      "try:",
+      " _f.ParamGet('User parameter:BaseApp/Preferences/Mod/Draft').SetBool('dxfShowDialog',False)",
+      "except Exception: pass",
+      // Same trap for IFC (BIM/architecture interop): importers/exportIFC + nativeifc
+      // readPreferences pop FreeCADGui.showPreferences() when Arch 'ifcShowDialog' is
+      // unset (default True). Pin False so IFC import/export don't crash.
+      "try:",
+      " _f.ParamGet('User parameter:BaseApp/Preferences/Mod/Arch').SetBool('ifcShowDialog',False)",
+      "except Exception: pass",
+      // Expose FreeCAD.installAddon('owner/repo') in the Python console: it drops a request
+      // file that the JS watcher picks up and installs via GitHub fetch (no git in wasm). Once.
+      "if not getattr(_f,'_fcweb_addon_api',False):",
+      " def _fcweb_install_addon(spec):",
+      "  open('/tmp/_fcaddonreq','w').write(str(spec)); print('requested addon install: '+str(spec))",
+      " _f.installAddon=_fcweb_install_addon; _f._fcweb_addon_api=True",
+      "_md=_mw.findChild(QtWidgets.QMdiArea) if _mw else None",
+      "_sub=_md.activeSubWindow() if _md else None",
+      "_w=_sub.widget() if _sub else None",
+      "if _w is not None:",
+      " _p=_w.mapTo(_mw, QtCore.QPoint(0,0))",
+      " _r=[_p.x(),_p.y(),_w.width(),_w.height()]",
+      " if getattr(_f,'_fcrect_last',None)!=_r:",
+      "  _f._fcrect_last=_r",
+      "  _s.__stderr__.write('FCRECT '+_j.dumps(_r)+'\\n'); _s.__stderr__.flush()",
+      // wasm: entering Sketcher edit sets the sketch ViewProvider Visibility=False,
+      // and the edit geometry (EditRoot) sits under that visibility switch — which,
+      // under the emscripten GL emulation, culls the whole subtree so you sketch
+      // 'blind'. Force the in-edit ViewProvider visible so its edit scene renders.
+      // Flipping Visibility alone doesn't repaint the viewport, so the sketch would only
+      // appear on the user's next camera move; nudge a redraw once so it shows immediately.
+      "try:",
+      " _ad=_g.activeDocument()",
+      " _ie=_ad.getInEdit() if _ad else None",
+      " if _ie is not None and not bool(_ie.Visibility):",
+      "  _ie.Visibility=True",
+      // This branch runs exactly once per edit session (the guard flips Visibility to True).
+      // Just flipping Visibility repaints nothing, and a plain redraw() populates the FBO but
+      // doesn't reposition/show the overlay — only a ViewFit fully re-renders AND republishes
+      // the widget rect so the compositor shows it. A one-time fit also frames the sketch,
+      // which is the right thing on entering edit.
+      "  try: _g.SendMsgToActiveView('ViewFit')",
+      "  except Exception: pass",
+      "except Exception: pass",
+      ""
+    ].join("\n");
+    function publishRect(){
+      try{ var m=window.fcInstance; if(!window.__fcAppReady||!m||!m._fcweb_run_python) return;
+        if(window.__fcPyBusy) return;   // skip tick while a call is suspended (no reentrancy)
+        var n=new TextEncoder().encode(RECT_PY).length+1; var q=m._malloc(n);
+        m.stringToUTF8(RECT_PY,q,n); fcRunPy(m,q);
+      }catch(e){}
+    }
+    setTimeout(publishRect, 4000); setInterval(publishRect, 1500);
+    window.addEventListener('resize', ()=>setTimeout(publishRect,120));
+
+    })();               // end compositor
+
+    // --- Crash resilience: periodic auto-save of open documents to the persisted
+    // home (IDBFS), plus restore-on-boot. FreeCAD's native recovery writes to /tmp
+    // (ephemeral MEMFS in wasm), so it can't survive a reload; this keeps a live
+    // .FCStd copy of every open doc under the IDBFS-backed home so the rare
+    // event-loop trap (or any reload) never loses work — web-app "always restore"
+    // model. saveCopy() persists without touching the doc's own path/dirty state.
+    function runPy(src){
+      try{ var m=window.fcInstance; if(!window.__fcAppReady||!m||!m._fcweb_run_python) return;
+        if(window.__fcPyBusy) return;   // skip tick while a call is suspended (no reentrancy)
+        var n=new TextEncoder().encode(src).length+1; var q=m._malloc(n);
+        m.stringToUTF8(src,q,n); fcRunPy(m,q);
+      }catch(e){}
+    }
+    // Autosave is driven by EDITS, not by a clock, and lives in its own directory.
+    //
+    // Three defects were measured here, each of which lost a user's work outright:
+    //   1. a 30 s timer meant "draw something, hit reload" lost everything -- the most
+    //      likely first five minutes anyone spends with this app. A document observer now
+    //      marks the session dirty and the tick saves only when there is something to save.
+    //   2. the copies lived in /home/web_user/.FreeCAD/recovery, which is FreeCAD's own
+    //      recovery folder. Its own directory now.
+    //   3. the prune that drops copies of closed documents ran BEFORE the restore pass, so
+    //      on every boot it deleted the autosaves while no document was open yet -- the
+    //      file read back from IndexedDB at +3 s and was gone by +8 s. It is now gated on
+    //      the restore having completed. (With the original 30 s tick the prune happened
+    //      to land after the 13 s restore, which is the only reason this ever worked.)
+    var AUTOSAVE_DIR = "/home/web_user/.fcweb-autosave";
+    // Deliberately in /tmp, not under the IDBFS mount: it must be absent on every fresh
+    // boot so a stale marker can never convince us autosave is running when it is not.
+    var AUTOSAVE_MARKER = "/tmp/.fcweb_saver_installed";
+    var AUTOSAVE_INSTALL = [
+      "import FreeCAD as _App, os as _os",
+      "if not getattr(_App, '_fcweb_saver', None):",
+      "    class _FcwebSaver(object):",
+      "        DIR = '" + AUTOSAVE_DIR + "'",
+      "        def __init__(self):",
+      "            self.dirty = True",
+      "        def _touch(self, *a):",
+      "            self.dirty = True",
+      "        slotChangedObject = _touch",
+      "        slotCreatedObject = _touch",
+      "        slotDeletedObject = _touch",
+      "        slotCreatedDocument = _touch",
+      "        slotDeletedDocument = _touch",
+      "        slotChangedDocument = _touch",
+      "        slotRedoDocument = _touch",
+      "        slotUndoDocument = _touch",
+      "        def save(self, force=False):",
+      "            if not (force or self.dirty):",
+      "                return",
+      "            _os.makedirs(self.DIR, exist_ok=True)",
+      "            names = set()",
+      "            for d in list(_App.listDocuments().values()):",
+      "                fn = getattr(d, 'FileName', '') or ''",
+      "                if fn.startswith('/freecad/'):",
+      "                    continue",          // bundled examples are read-only, not work
+      "                names.add(d.Name)",
+      "                try:",
+      "                    d.saveCopy(_os.path.join(self.DIR, d.Name + '.FCStd'))",
+      "                except Exception:",
+      "                    pass",
+      "            if getattr(_App, '_fcweb_restored', False):",
+      "                for f in _os.listdir(self.DIR):",
+      "                    if f.endswith('.FCStd') and f[:-6] not in names:",
+      "                        try:",
+      "                            _os.remove(_os.path.join(self.DIR, f))",
+      "                        except Exception:",
+      "                            pass",
+      "            self.dirty = False",
+      "    _App._fcweb_saver = _FcwebSaver()",
+      "    _App.addDocumentObserver(_App._fcweb_saver)",
+      // Proof of life the JS side can actually see. runPy swallows every error, so without
+      // a marker "we called it" and "it worked" are indistinguishable -- which is exactly
+      // how this silently stopped autosaving anything.
+      "try:",
+      "    open('" + AUTOSAVE_MARKER + "','w').write('1' if getattr(_App,'_fcweb_saver',None) else '0')",
+      "except Exception:",
+      "    pass",
+      ""
+    ].join("\n");
+    var RESTORE_PY = [
+      "import FreeCAD as _App, os as _os, sys as _s",
+      "_rec = '" + AUTOSAVE_DIR + "'",
+      "_n = 0",
+      "import time as _t",
+      "if _os.path.isdir(_rec):",
+      "    _all = [_f for _f in _os.listdir(_rec) if _f.endswith('.FCStd')]",
+      "    _paths = [_os.path.join(_rec, _f) for _f in _all]",
+      // A week-old recovery copy is not work in progress, it is litter.
+      "    for _p in list(_paths):",
+      "        try:",
+      "            if _t.time() - _os.path.getmtime(_p) > 7 * 86400:",
+      "                _os.remove(_p); _paths.remove(_p)",
+      "        except Exception:",
+      "            pass",
+      // Reopening EVERY document from every past session took over a minute on a
+      // returning profile with 16 of them and looked exactly like a hang. Newest few only.
+      "    _paths.sort(key=lambda _p: -_os.path.getmtime(_p))",
+      "    _skipped = max(0, len(_paths) - 3)",
+      "    for _p in _paths[:3]:",
+      "        try:",
+      "            _App.openDocument(_p); _n += 1",
+      "        except Exception:",
+      "            pass",
+      "    if _skipped:",
+      "        _s.__stderr__.write('[fcweb] %d older recovery file(s) left unopened in %s\\n' % (_skipped, _rec))",
+      "_App._fcweb_restored = True",          // gates the prune; set even when nothing was found
+      "if _n: _s.__stderr__.write('[fcweb] restored %d document(s) from your last session\\n' % _n); _s.__stderr__.flush()",
+      ""
+    ].join("\n");
+    // ---- memory pressure ------------------------------------------------------
+    // The heap is a FIXED 2 GB, so a big enough model aborts the instance. Until now the
+    // only signal was the abort itself -- the user got a message after losing the session.
+    // _emscripten_get_sbrk_ptr is exported (see the link command), so the used portion is
+    // a plain memory read: no Python, no round trip, and it still works while the
+    // interpreter is busy -- which is exactly when memory is being consumed.
+    //
+    // Measured on this build: 288 MB after boot, ~72 KB per simple solid (1600 boxes take
+    // it to 403 MB), so the ~1.76 GB of headroom is roughly 20k such solids. The point of
+    // warning at 80% is that the user's work is FORCE-SAVED while saving still works.
+    // Thresholds are overridable so the behaviour can be exercised without building a
+    // 1.6 GB model. (Faking it by swapping HEAPU8.buffer breaks the runtime -- the buffer
+    // is used all over emscripten's glue -- and produces a cascade of aborts that looks
+    // like the feature failing.)
+    var __memState = 0;
+    function memWarnAt(){ return +window.__fcwebMemWarn || 0.80; }
+    function memCritAt(){ return +window.__fcwebMemCrit || 0.92; }
+    function heapUsedFraction(){
+      try {
+        var m = window.fcInstance;
+        if (!m || typeof m._emscripten_get_sbrk_ptr !== 'function') return -1;
+        var used = m.HEAPU32[m._emscripten_get_sbrk_ptr() >> 2];
+        var cap = m.HEAPU8.buffer.byteLength;
+        return cap > 0 ? used / cap : -1;
+      } catch (e) { return -1; }
+    }
+    function checkMemoryPressure(){
+      var f = heapUsedFraction();
+      if (f < 0) return;
+      var mb = Math.round(f * 2048);
+      if (f >= memCritAt() && __memState < 2) {
+        __memState = 2;
+        try { py(AUTOSAVE_FORCE); } catch (e) {}
+        if (typeof window.fcwebNotify === 'function') {
+          window.fcwebNotify('Memory is nearly full (' + mb + ' MB of 2048 MB). Your work has '
+            + 'been saved. Save a copy with File \u2192 Save and close documents you are not '
+            + 'using -- the browser build cannot grow past 2 GB.', 'warn');
+        }
+      } else if (f >= memWarnAt() && __memState < 1) {
+        __memState = 1;
+        try { py(AUTOSAVE_FORCE); } catch (e) {}
+        if (typeof window.fcwebNotify === 'function') {
+          window.fcwebNotify('This model is using ' + mb + ' MB of the 2 GB the browser build '
+            + 'has. Your work has been saved. Consider simplifying it or closing documents you '
+            + 'are not using.', 'warn');
+        }
+      } else if (f < memWarnAt() - 0.05) {
+        __memState = 0;              // recovered (documents closed); allow warning again
+      }
+    }
+    setInterval(checkMemoryPressure, 5000);
+    window.fcwebHeapUsedMB = function(){
+      var f = heapUsedFraction(); return f < 0 ? -1 : Math.round(f * 2048);
+    };
+
+    var AUTOSAVE_PY = "import FreeCAD as _App\n" +
+      "try: _App._fcweb_saver.save()\n" +
+      "except Exception: pass\n";
+    var AUTOSAVE_FORCE = "import FreeCAD as _App\n" +
+      "try: _App._fcweb_saver.save(True)\n" +
+      "except Exception: pass\n";
+    // Sequence on READINESS, not on fixed timers. runPy is a no-op until the interpreter
+    // exists, and on a cold first load (empty HTTP cache) it does not by 11 s -- the
+    // observer was never installed, so nothing was ever saved, and the work of a user's
+    // very first session was the one thing guaranteed to be lost.
+    (function(){
+      var installed = false, restored = false;
+      function ready(){
+        var m = window.fcInstance;
+        return !!(window.__fcAppReady && m && m._fcweb_run_python && m.FS && !window.__fcPyBusy);
+      }
+      // Did the install actually take? runPy reports nothing -- it swallows every error and
+      // is a silent no-op whenever the interpreter is not yet able to take the call. The
+      // old loop set installed=true right after calling it, cleared itself on the next
+      // tick, and left the session with NO observer, NO restore, and a 1.5 s tick poking a
+      // _fcweb_saver that did not exist. Every failure on that path is silent, so it
+      // presented as "autosave works" while nothing was ever written.
+      //
+      // Measured on production: saver=False, restored=None, autosave dir empty after a
+      // clean boot. It surfaced only once the engine cache cut boot from ~170 s to ~20 s --
+      // the race was always there, the speedup just started winning it.
+      function installed_ok(){
+        try { var m = window.fcInstance;
+              return !!(m && m.FS && m.FS.analyzePath(AUTOSAVE_MARKER).exists); }
+        catch(e){ return false; }
+      }
+      var tries = 0;
+      var poll = setInterval(function(){
+        if (!ready()) return;
+        if (!installed) {
+          runPy(AUTOSAVE_INSTALL);
+          if (!installed_ok()) {                 // retry rather than assume
+            if (++tries % 10 === 0) { append('[autosave] install has not taken after ' + tries + ' attempts', 'err'); }
+            if (tries > 60) {                    // ~1 min: stop trying, but SAY so
+              clearInterval(poll);
+              try { window.fcwebNotify && window.fcwebNotify(
+                'Autosave could not start, so your work is NOT being saved automatically. ' +
+                'Use File → Save to keep a copy.', 'error'); } catch(e){}
+            }
+            return;
+          }
+          installed = true; append('[autosave] observer installed'); return;
+        }
+        if (!restored) { runPy(RESTORE_PY); restored = true; return; }
+        clearInterval(poll);
+        setInterval(function(){ runPy(AUTOSAVE_PY); }, 1500);
+        // Mirror the autosave copies out to a real folder on the user's disk, if they have
+        // nominated one. Slower cadence than the in-browser autosave on purpose: this
+        // writes through the File System Access API and is for durability, not for
+        // catching the last 1.5 s of edits.
+        setInterval(function(){ try { window.__fcMirrorOut && window.__fcMirrorOut(); } catch(e){} }, 20000);
+        setInterval(function(){ runPy(AUTOSAVE_FORCE); }, 120000);  // backstop for a missed notify
+      }, 1000);
+    })();
+    // Closing or hiding the tab: force a save. pagehide is the one that fires on reload.
+    document.addEventListener('visibilitychange', function(){ if(document.hidden) runPy(AUTOSAVE_FORCE); });
+    window.addEventListener('pagehide', function(){ runPy(AUTOSAVE_FORCE); });
+    function ensureOverlay(){
+      if (ov) return;
+      var screen = document.getElementById('screen');
+      ov = document.createElement('canvas');
+      ov.id = 'fcweb-3d-overlay';
+      ov.style.cssText = 'position:absolute;pointer-events:none;z-index:5;';
+      screen.appendChild(ov);
+      ovctx = ov.getContext('2d');
+    }
+    // Read Coin's render from the CURRENTLY BOUND framebuffer (its own QOpenGLWidget
+    // FBO when ?nofbo0 is set — a buffer Qt's UI never overdraws) and paint it to
+    // the overlay, synchronously at draw time so the FBO content is guaranteed live.
+    function blit(gl, x, y, w, h){
+      if (w<=0||h<=0) return;
+      try {
+        if (!buf || lastW!==w || lastH!==h){ buf=new Uint8Array(w*h*4); imgData=new ImageData(w,h); lastW=w; lastH=h; ensureOverlay(); }
+        gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);  // reads current READ_FRAMEBUFFER
+        var d=imgData.data, opaque=0;
+        // Key out Coin's ACTUAL background color rather than a hardcoded gray: Coin
+        // clears the FBO to black or the theme gray depending on state, so a fixed
+        // key leaves a black rectangle over the viewport. Sample the FBO border
+        // (where the centered model rarely reaches) and take the per-channel median
+        // of 8 points so one clipped sample can't skew the key.
+        function _px(ix,iy){ var o=(iy*w+ix)*4; return [buf[o],buf[o+1],buf[o+2]]; }
+        var _sp=[_px(1,1),_px(w-2,1),_px(1,h-2),_px(w-2,h-2),_px(w>>1,1),_px(w>>1,h-2),_px(1,h>>1),_px(w-2,h>>1)];
+        function _med(ch){ var a=_sp.map(function(s){return s[ch];}).sort(function(x,y){return x-y;}); return (a[3]+a[4])>>1; }
+        var keyR=_med(0), keyG=_med(1), keyB=_med(2), TOL=24;
+        // The overlay sits EXACTLY over the 3D widget (FBO size == widget rect), and the FBO
+        // already holds the complete rendered view (its own background + the model/geometry).
+        // So paint it OPAQUE — show the FBO's own background rather than keying it out. Keying
+        // the background transparent exposed the dark Qt canvas behind the overlay, and thin
+        // dark geometry (notably Sketcher edit-mode lines) then vanished on that dark canvas.
+        // We still COUNT non-background pixels (via the border-median key) purely to skip
+        // background-only passes below, but every pixel is drawn opaque so the viewport shows
+        // the true render for BOTH normal 3D and sketch-edit.
+        for (var row=0; row<h; row++){
+          var src=(h-1-row)*w*4, dst=row*w*4;   // flip GL bottom-up -> top-down
+          for (var col=0; col<w*4; col+=4){ var rr=buf[src+col],gg=buf[src+col+1],bb=buf[src+col+2];
+            d[dst+col]=rr; d[dst+col+1]=gg; d[dst+col+2]=bb;
+            var isBg=(Math.abs(rr-keyR)<=TOL && Math.abs(gg-keyG)<=TOL && Math.abs(bb-keyB)<=TOL);
+            d[dst+col+3]= 255; if(!isBg)opaque++; }
+        }
+        window.__ovOpaque = opaque;  // non-background pixel count (diagnostic)
+        // Only PAINT a pass that has substantial geometry, so a background-only pass
+        // doesn't wipe the frame that had the model. `opaque` is the full-res count.
+        var nonbg=opaque;
+        window.__ovBlits=(window.__ovBlits||0)+1; window.__ovMaxNonBg=Math.max(window.__ovMaxNonBg||0,nonbg); window.__ovLastFbo=(w+'x'+h);
+        (window.__ovLog=window.__ovLog||[]).length<60 && window.__ovLog.push(w+'x'+h+':'+nonbg);
+        if (nonbg < 500) return;  // background-only read — don't overwrite the model frame
+        ov.width=w; ov.height=h;                 // backing store = FBO device px
+        ovctx.putImageData(imgData, 0, 0);
+        // Position the overlay exactly over the 3D widget's on-screen rect (CSS px,
+        // published from Qt via FCRECT). Preserve the FBO aspect (contain-fit,
+        // centered) so the model is never stretched. Fall back to the whole screen
+        // rect until the first FCRECT arrives.
+        var R = window.__fcWidgetRect;               // [x,y,w,h] CSS, in-window
+        var rx, ry, rw, rh;
+        if (R && R.length===4 && R[2]>10 && R[3]>10){ rx=R[0]; ry=R[1]; rw=R[2]; rh=R[3]; }
+        else { var sc=document.getElementById('screen').getBoundingClientRect(); rx=0; ry=0; rw=sc.width; rh=sc.height; }
+        var af = w/h, ar = rw/rh, dispW, dispH;
+        if (af > ar){ dispW = rw; dispH = rw/af; } else { dispH = rh; dispW = rh*af; }
+        ov.style.left  = Math.round(rx + (rw-dispW)/2) + 'px';
+        ov.style.top   = Math.round(ry + (rh-dispH)/2) + 'px';
+        ov.style.width = Math.round(dispW)+'px';
+        ov.style.height= Math.round(dispH)+'px';
+      } catch(e){ if(window.__ovErr!==String(e)){ window.__ovErr=String(e); console.log('[overlay]',e); } }
+    }
+    var capGl=null, capFbo=null, capVP=null, rafPending=false;
+    // Read Coin's FBO right after its frame's draws (rAF), while the buffer is
+    // still fresh (a persistent poll would read stale/recycled FBOs). This
+    // re-fires on every Coin redraw, so camera moves / orbit update the overlay.
+    function frameBlit(){
+      rafPending=false;
+      if (!capGl || !capVP) return;
+      var gl=capGl, prev=gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, capFbo);
+      blit(gl, capVP[0], capVP[1], capVP[2], capVP[3]);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prev);
+    }
+    var USE_OVERLAY = /[?&]overlay=1/.test(location.search);  // legacy readback path, opt-in only
+
+    // GL state shadow. The per-draw hook below needs the viewport and the bound
+    // framebuffer on EVERY draw call, and getParameter is a synchronous round-trip to the
+    // GPU process: measured at 2 per draw, 2513 of each per orbit and 25% of the wall
+    // clock while dragging EngineBlock (4170 draws/frame on BIMExample). Nothing outside
+    // this page changes these, so track them from the setters and never ask the GPU.
+    var __shVp = new WeakMap(), __shFbo = new WeakMap(), __shDepth = new WeakMap();
+    (function(){
+      var P = WebGL2RenderingContext.prototype;
+      var vp = P.viewport;
+      P.viewport = function(x,y,w,h){ __shVp.set(this,[x,y,w,h]); return vp.apply(this,arguments); };
+      var bf = P.bindFramebuffer;
+      P.bindFramebuffer = function(t,f){
+        // FRAMEBUFFER_BINDING reports the DRAW binding; a READ_FRAMEBUFFER bind (frameBlit)
+        // must not disturb it.
+        if (t===this.FRAMEBUFFER || t===this.DRAW_FRAMEBUFFER) __shFbo.set(this,f||null);
+        return bf.apply(this,arguments);
+      };
+      var en = P.enable, di = P.disable;
+      P.enable  = function(c){ if(c===this.DEPTH_TEST) __shDepth.set(this,true);  return en.apply(this,arguments); };
+      P.disable = function(c){ if(c===this.DEPTH_TEST) __shDepth.set(this,false); return di.apply(this,arguments); };
+    })();
+    // Seed from the real state the first time only: a draw can happen before the app has
+    // called viewport()/bindFramebuffer() at all.
+    function shVp(gl){ var v=__shVp.get(gl); if(!v){ v=gl.getParameter(gl.VIEWPORT); __shVp.set(gl,v); } return v; }
+    function shFbo(gl){ if(!__shFbo.has(gl)) __shFbo.set(gl, gl.getParameter(gl.FRAMEBUFFER_BINDING)); return __shFbo.get(gl); }
+    function shDepth(gl){ if(!__shDepth.has(gl)) __shDepth.set(gl, gl.isEnabled(gl.DEPTH_TEST)); return __shDepth.get(gl); }
+    ['drawArrays','drawElements'].forEach(function(nm){
+      var orig = WebGL2RenderingContext.prototype[nm];
+      WebGL2RenderingContext.prototype[nm] = function(){
+        var r = orig.apply(this, arguments);
+        var vp = shVp(this);
+        var fbo = shFbo(this);
+        // Depth fix: Qt re-binds its widget FBO mid-render, so the C++ depth clear
+        // lands on the wrong buffer → frame 2+ geometry fails the depth test and
+        // vanishes (renders once, then blank). The Coin background quad (count=4,
+        // depth-test OFF, big viewport) is always the FIRST draw of a frame on the
+        // real target — clear depth right after it, on whatever FBO is truly bound.
+        if (nm==='drawArrays' && arguments[2]===4 && fbo && vp && vp[2]>=300 && !shDepth(this)) {
+          this.clearDepth(1); this.clear(this.DEPTH_BUFFER_BIT);
+        }
+        // Coin renders into a DEDICATED offscreen FBO (window.__fcCoinFbo, set by
+        // View3DInventorViewer::renderScene); Qt's UI draws go to the default
+        // framebuffer (fbo === null). So blit ONLY when a real FBO is bound — that
+        // isolates the clean 3D scene and drops the UI entirely (no ghosting).
+        // NATIVE COMPOSITE: the C++ now blits Coin's private FBO straight into the
+        // QOpenGLWidget's own backing FBO, and Qt's wasm compositor presents it to
+        // the page canvas exactly like desktop — no readback, no overlay, no CSS.
+        // Leave the legacy overlay path here only as an opt-in fallback (?overlay=1);
+        // it is inert once C++ sets __fcNativeComposite (from the first frame).
+        if (window.__fcNativeComposite && !USE_OVERLAY) return r;
+        if (fbo && vp && vp[2]>=200 && vp[3]>=150) {
+          // COALESCE: do NOT readPixels+blit on every draw — a complex scene emits
+          // thousands of draws per frame (immediate-mode BIMExample: 25k+ per second),
+          // and each blit() does a full-viewport gl.readPixels (a GPU->CPU sync, the most
+          // expensive GL op) plus a full-image CPU pixel scan. That was O(draws*pixels)
+          // and made a 14k-face model take minutes. Instead just remember the FBO+viewport
+          // and schedule ONE blit on the next animation frame, which fires after this whole
+          // synchronous draw batch completes — the FBO still holds the finished frame.
+          // O(frames*pixels), the correct cost.
+          capGl=this; capFbo=fbo; capVP=vp;
+          if(!rafPending){ rafPending=true; requestAnimationFrame(frameBlit); }
+        }
+        return r;
+      };
+    });
+    console.log('[fcweb] 3D presentation: native Qt composite (overlay '+(USE_OVERLAY?'forced ON':'inert')+')');
+
+    // ---- redundant GL state elimination ----------------------------------------------
+    // emscripten's GL emulation re-selects the SAME program, re-sets the SAME constant
+    // colour attribute and the SAME line width before every immediate-mode block. On
+    // BIMExample that is ~3500 useProgram and ~3000 vertexAttrib4fv calls per frame that
+    // change nothing. Dropping the ones whose value is unchanged removes the call without
+    // altering any state the GPU can observe.
+    //
+    // NOTE: merging the draw calls themselves was tried and REVERTED. 93% of this scene's
+    // draws are two-vertex edge segments and they do merge (2.8 per batch), but the
+    // emulation still emits bufferSubData + vertexAttribPointer + enable/disable for each
+    // segment either way, so batching only the draw adds work: it measured 3x SLOWER.
+    // Fixing that has to happen where the per-segment setup is generated -- emscripten's
+    // GLImmediate flush, or Coin emitting one GL_LINES batch per shape.
+    (function () {
+      if (/[?&]noredundant=1/.test(location.search)) return;
+      var P = WebGL2RenderingContext.prototype;
+      var realUseProgram = P.useProgram, realLineWidth = P.lineWidth;
+      var realVA4fv = P.vertexAttrib4fv, realVA4f = P.vertexAttrib4f;
+      var skipped = window.__glSkipped = { useProgram: 0, vertexAttrib: 0, lineWidth: 0 };
+      function stt(gl) { return gl.__rs || (gl.__rs = { va: {} }); }
+      P.useProgram = function (pr) {
+        var s = stt(this);
+        if (s.prog === pr) { skipped.useProgram++; return; }
+        s.prog = pr;
+        return realUseProgram.apply(this, arguments);
+      };
+      P.lineWidth = function (w) {
+        var s = stt(this);
+        if (s.lw === w) { skipped.lineWidth++; return; }
+        s.lw = w;
+        return realLineWidth.apply(this, arguments);
+      };
+      function constAttr(gl, idx, x, y, z, w, orig, args) {
+        var c = stt(gl).va, p = c[idx];
+        if (p && p[0] === x && p[1] === y && p[2] === z && p[3] === w) { skipped.vertexAttrib++; return; }
+        c[idx] = [x, y, z, w];
+        return orig.apply(gl, args);
+      }
+      P.vertexAttrib4fv = function (idx, v) {
+        return constAttr(this, idx, v[0], v[1], v[2], v[3], realVA4fv, arguments); };
+      P.vertexAttrib4f = function (idx, x, y, z, w) {
+        return constAttr(this, idx, x, y, z, w, realVA4f, arguments); };
+      // Drain any pending immediate-mode line batch before ANY other GL call: while it
+      // accumulates, no GL call happens at all, which is the entire point.
+      (function () {
+        var busy = false;
+        Object.getOwnPropertyNames(P).forEach(function (k) {
+          var f; try { f = P[k]; } catch (e) { return; }
+          if (typeof f !== 'function') return;
+          P[k] = function () {
+            var G = globalThis.__GLI;
+            if (!busy && G && G.__mrgPend) { busy = true; try { G.__flushMerged(); } finally { busy = false; } }
+            return f.apply(this, arguments);
+          };
+        });
+      })();
+      console.log('[fcweb] redundant GL state elimination + line merging ON');
+    })();
+
+
+    // --- Readable window decorations -------------------------------------------------
+    // Qt-wasm draws each top-level window's frame as DOM inside #qt-shadow-container's
+    // shadow root (.qt-decorated-window > .title-bar > .window-name), styled by Qt's own
+    // stylesheet. Its defaults are unusable over FreeCAD's dark theme: the title text is
+    // #dddddd while the frame behind it is #d3d3d3 — a ~1.06:1 contrast ratio, i.e. the
+    // dialog title is invisible ("Active Body Required" reads as a blank bar). The same
+    // light frame is what shows as the big grey slab around a dialog before its canvas
+    // paints. Restyle the decoration to match the app's dark theme and give the title real
+    // contrast. Shadow DOM is isolated, so page CSS can't reach it — inject a stylesheet
+    // into the shadow root itself.
+    (function(){
+      var CSS = [
+        '.qt-decorated-window { background-color:#31363b !important;',
+        '  border:1px solid #21262b !important; border-radius:4px !important; }',
+        '.title-bar { background-color:#3a4046 !important; height:22px !important;',
+        '  padding:2px 4px 4px 4px !important; border-bottom:1px solid #21262b !important; }',
+        '.title-bar .window-name { color:#f2f4f6 !important; font-weight:600 !important;',
+        "  font-family:'Segoe UI',system-ui,-apple-system,sans-serif !important; font-size:12px !important; }",
+        // Qt marks unfocused windows .inactive — keep those legible too, just dimmer.
+        '.qt-decorated-window.inactive .title-bar { background-color:#33383d !important; }',
+        '.qt-decorated-window.inactive .title-bar .window-name { color:#c2c8ce !important; }',
+        // the close/max glyphs are dark-on-dark by default
+        '.title-bar .image-button { filter:invert(92%) !important; opacity:.9 !important; }'
+      ].join('\n');
+      function inject(){
+        var host=document.getElementById('qt-shadow-container');
+        if(!host || !host.shadowRoot) return false;
+        if(host.shadowRoot.getElementById('fcweb-decor')) return true;
+        var st=document.createElement('style'); st.id='fcweb-decor'; st.textContent=CSS;
+        host.shadowRoot.appendChild(st);
+        console.log('[fcweb] window decoration style injected');
+        return true;
+      }
+      if(!inject()){ var iv=setInterval(function(){ if(inject()) clearInterval(iv); },300);
+        setTimeout(function(){ clearInterval(iv); },120000); }
+    })();
+  })();
+})();
+</script>
+<script>
+/* Browser support gate. This runs BEFORE FreeCAD.js, because loading that script starts
+   the ~115 MB download immediately -- and on a browser that cannot run this build the
+   user previously watched all of it arrive, saw "DOWNLOADING 100%", and then waited
+   forever with nothing logged anywhere.
+
+   JSPI (WebAssembly.Suspending) is the hard one: modal dialogs, the gmsh and CalculiX
+   bridges and every Python-triggered dialog suspend through it. As of today that means
+   Chrome/Edge 137+. SharedArrayBuffer needs COOP+COEP (served by infra/nginx.conf), and
+   Coin renders through WebGL2. */
+(function () {
+  function webgl2() {
+    try { return !!document.createElement('canvas').getContext('webgl2'); }
+    catch (e) { return false; }
+  }
+  var missing = [];
+  if (typeof WebAssembly === 'undefined' || typeof WebAssembly.Suspending !== 'function') {
+    missing.push(['JavaScript Promise Integration (JSPI)',
+                  'Chrome or Edge 137 and later. Firefox and Safari do not support it yet.']);
+  }
+  if (typeof SharedArrayBuffer === 'undefined' || !self.crossOriginIsolated) {
+    missing.push(['SharedArrayBuffer with cross-origin isolation',
+                  'the page must be served with COOP and COEP headers.']);
+  }
+  if (!webgl2()) {
+    missing.push(['WebGL2', 'hardware acceleration may be disabled in your browser settings.']);
+  }
+
+  if (!missing.length) {
+    ['FreeCAD.js?v=6b54152eaf25', 'qtloader.js'].reduce(function (chain, src) {
+      return chain.then(function () {
+        return new Promise(function (ok, no) {
+          var s = document.createElement('script');
+          s.src = src; s.onload = ok; s.onerror = function () { no(new Error(src)); };
+          document.head.appendChild(s);
+        });
+      });
+    }, Promise.resolve()).then(function () { init(); }, function (e) {
+      var d = document.getElementById('ld-status');
+      if (d) { d.textContent = 'could not load ' + e.message; }
+    });
+    return;
+  }
+
+  window.__FC_UNSUPPORTED = true;
+  // Which capability turned them away, so "how many arrivals can't run this at all, and
+  // is it still JSPI?" is answerable -- that decides when Firefox becomes worth supporting.
+  // Records the check name only; `missing` holds fixed strings, never anything user-derived.
+  try {
+    var why = /JSPI/.test(missing[0][0]) ? 'jspi'
+            : /SharedArrayBuffer/.test(missing[0][0]) ? 'sab'
+            : /WebGL2/.test(missing[0][0]) ? 'webgl2' : 'other';
+    window.fcwebEvent('boot_gate', why);
+  } catch (e) {}
+  var boot = document.getElementById('load');
+  if (boot) { boot.className = ''; }
+  var st = document.getElementById('ld-status');
+  if (st) { st.textContent = 'This browser cannot run FreeCAD-Web'; }
+  var fill = document.getElementById('ld-fill');
+  if (fill && fill.parentNode) { fill.parentNode.style.display = 'none'; }
+  var det = document.getElementById('ld-detail');
+  if (det) {
+    var html = 'Nothing has been downloaded. FreeCAD-Web needs:<br><br>';
+    for (var i = 0; i < missing.length; i++) {
+      html += '<b>' + missing[i][0] + '</b> &mdash; ' + missing[i][1] + '<br>';
+    }
+    html += '<br>Please open this page in Chrome or Edge 137 or later on a desktop.';
+    det.innerHTML = html;
+    det.style.maxWidth = '34em';
+    det.style.lineHeight = '1.6';
+  }
+})();
+</script>
+<script>
+/* FCWEB file bridge: Qt-for-WebAssembly's native Open/Save-As dialogs need ASYNCIFY
+   (absent in this multithread build) — they abort with "emscripten_sleep needs async".
+   So bridge file I/O through the browser directly: Save = write the doc to the IDBFS
+   home, read the bytes, download a Blob; Open = HTML file input -> write to the FS ->
+   openDocument/insert. Wired to on-screen buttons AND Ctrl+S / Ctrl+O (capture phase,
+   so the broken native dialog never fires). Work also persists across reloads via the
+   IDBFS home, so nothing is lost regardless. */
+(function(){
+  function py(code){ var m=window.fcInstance;
+    if(!window.__fcAppReady||!m||!m._fcweb_run_python) return false;
+    var n=new TextEncoder().encode(code).length+1, q=m._malloc(n); m.stringToUTF8(code,q,n);
+    // Route through the guarded runner: sets __fcPyBusy so periodic intervals back
+    // off while this (possibly long, JSPI-suspending) op runs, and frees the ptr
+    // only when the call actually settles (a raw finally-free would free it while a
+    // suspended call still holds it). File open/save go through here.
+    (window.fcRunPy||function(mm,pp){ mm._fcweb_run_python(pp); mm._free(pp); })(m,q);
+    return true; }
+  function ready(){ var m=window.fcInstance;
+    return window.__fcAppReady && m && m._fcweb_run_python && m.FS; }
+
+  async function download(){
+    if(!ready()){ return; }
+    var m=window.fcInstance, FS=m.FS, dir='/home/web_user/_dl';
+    try{ FS.mkdirTree ? FS.mkdirTree(dir) : FS.mkdir(dir); }catch(e){}
+    try{ FS.unlink(dir+'/done'); }catch(e){}
+    py([
+      "import FreeCAD, os",
+      "d = FreeCAD.ActiveDocument",
+      "o = "+JSON.stringify(dir),
+      "os.makedirs(o, exist_ok=True)",
+      "err=''",
+      "try:",
+      "  if d is None: err='no active document'",
+      "  else:",
+      "    lbl=''.join(c for c in (d.Label or 'document') if c.isalnum() or c in '-_ ').strip() or 'document'",
+      "    fp=os.path.join(o, lbl+'.FCStd')",
+      "    d.saveAs(fp)",
+      "    open(os.path.join(o,'name'),'w').write(lbl+'.FCStd')",
+      "except Exception as e: err=str(e)",
+      "open(os.path.join(o,'done'),'w').write(err)"
+    ].join('\n'));
+    for(var i=0;i<80;i++){
+      await new Promise(function(r){setTimeout(r,150);});
+      var err; try{ err=new TextDecoder().decode(FS.readFile(dir+'/done')); }catch(e){ continue; }
+      if(err){ alert('Save failed: '+err); return; }
+      var name=new TextDecoder().decode(FS.readFile(dir+'/name'));
+      var bytes=FS.readFile(dir+'/'+name);
+      var blob=new Blob([bytes],{type:'application/octet-stream'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){URL.revokeObjectURL(a.href);},15000);
+      // The staged copy has been handed to the browser, so drop it. _dl sits UNDER the
+      // IDBFS mount, so anything left here is copied into IndexedDB and kept forever --
+      // the same storage autosave depends on. Left alone it grows without bound and the
+      // first symptom is the "your work is NOT being saved" quota toast, i.e. data loss.
+      try{ FS.unlink(dir+'/'+name); }catch(e){}
+      try{ FS.unlink(dir+'/name'); }catch(e){}
+      try{ FS.unlink(dir+'/done'); }catch(e){}
+      // They have just saved real work: the one moment the install offer is concretely
+      // about something they would mind losing.
+      try{ window.__fcWorkSaved && window.__fcWorkSaved(); }catch(e){}
+      return;
+    }
+    alert('Save timed out');
+  }
+
+  // Drop the staged upload once Python has consumed it. Appended to the SAME python
+  // snippet that does the import rather than unlinked from JS, because py() only queues
+  // the work -- deleting from JS would race the read.
+  //
+  // Deliberately NOT used for .FCStd: an opened document's FileName IS this path, and
+  // FreeCAD needs it to save. Those are left in place; they are files the user explicitly
+  // opened, not invisible litter. Everything else (STEP/STL/SVG/DXF/macros/zips) is copied
+  // into the document or the Mod dir on import, so the staged file is pure waste -- and
+  // _up lives under the IDBFS mount, so waste here is permanent IndexedDB growth.
+  function DROP_UPLOAD(p){
+    return "\ntry:\n import os; os.remove("+JSON.stringify(p)+")\nexcept Exception: pass";
+  }
+
+  function openFile(filter){
+    if(!ready()){ return; }
+    var inp=document.createElement('input'); inp.type='file';
+    inp.accept='.FCStd,.fcstd,.step,.stp,.iges,.igs,.brep,.brp,.stl,.obj,.FCMacro,.py,.svg,.dxf,.zip';
+    inp.style.cssText='position:fixed;left:-9999px;'; document.body.appendChild(inp);
+    inp.onchange=async function(){
+      try{
+      var f=inp.files&&inp.files[0]; if(!f){ inp.remove(); return; }
+      var buf=new Uint8Array(await f.arrayBuffer());
+      var m=window.fcInstance, FS=m.FS, dir='/home/web_user/_up';
+      try{ FS.mkdirTree ? FS.mkdirTree(dir) : FS.mkdir(dir); }catch(e){}
+      var safe=f.name.replace(/[^A-Za-z0-9._-]/g,'_'), path=dir+'/'+safe;
+      FS.writeFile(path, buf);
+      var ext=(f.name.split('.').pop()||'').toLowerCase();
+      if(ext==='fcstd'){
+        py("import FreeCAD, FreeCADGui as Gui\nD=FreeCAD.openDocument("+JSON.stringify(path)+")\nGui.updateGui()\ntry:\n v=Gui.activeDocument().activeView(); v.viewIsometric(); v.fitAll()\nexcept Exception: pass");
+      } else if(ext==='fcmacro'||ext==='py'){
+        // Macro / Python script: copy into the user macro dir (so it shows in Macro > Macros...)
+        // and run it immediately, exactly like FreeCAD's "Execute macro".
+        py([
+          "import os, shutil, FreeCAD, FreeCADGui as Gui",
+          "src="+JSON.stringify(path),
+          "md=FreeCAD.getUserMacroDir(True)",
+          "os.makedirs(md, exist_ok=True)",
+          "dst=os.path.join(md, os.path.basename(src))",
+          "try: shutil.copyfile(src, dst)",
+          "except Exception: dst=src",
+          "try:",
+          "  Gui.doCommandGui('exec(open(%r, encoding=\"utf-8\").read())' % dst)",
+          "except Exception as e:",
+          "  import sys; sys.__stderr__.write('macro error: %s\\n'%e)",
+          // Only if the copy into the macro dir actually landed somewhere else -- the
+          // except branch above falls back to dst=src, and removing it then would delete
+          // the macro we are about to run.
+          "if dst != src:",
+          "  try: os.remove(src)",
+          "  except Exception: pass"
+        ].join('\n'));
+      } else if(ext==='zip'){
+        // Custom workbench / addon package: extract into the user Mod dir and load it, so an
+        // engineer can install a plugin they already have as a .zip (no network needed).
+        installWorkbenchZip(path);
+      } else if(ext==='svg'||ext==='dxf'){
+        py("import FreeCAD, FreeCADGui as Gui, importSVG, importDXF\nd=FreeCAD.ActiveDocument or FreeCAD.newDocument('Imported')\n(importSVG if "+JSON.stringify(ext)+"=='svg' else importDXF).insert("+JSON.stringify(path)+", d.Name)\nd.recompute()\nGui.updateGui()\ntry:\n v=Gui.activeDocument().activeView(); v.viewIsometric(); v.fitAll()\nexcept Exception: pass"+DROP_UPLOAD(path));
+      } else {
+        py("import FreeCAD, Part, FreeCADGui as Gui\nd=FreeCAD.ActiveDocument or FreeCAD.newDocument('Imported')\nPart.insert("+JSON.stringify(path)+", d.Name)\nd.recompute()\nGui.updateGui()\ntry:\n v=Gui.activeDocument().activeView(); v.viewIsometric(); v.fitAll()\nexcept Exception: pass"+DROP_UPLOAD(path));
+      }
+      } finally { inp.remove(); }
+    };
+    inp.click();
+  }
+  // Save bridge: FreeCAD's native File > Save / Save As / Export (patched Gui/FileDialog.cpp
+  // getSaveFileName) hands us a staging path under /home/web_user/_dl and writes the file there
+  // in whatever format the user chose. We watch each registered path and download it to the
+  // user's machine when it appears or changes (mtime/size), so every Save/Export menu path works.
+  var pendingSaves={};  // path -> last {mtime,size} we handled
+  var saveTargets={};   // path -> Promise<FileSystemFileHandle|'cancelled'|null> (chosen destination)
+  // Ask the user WHERE to put the file, using the real OS save dialog (File System Access API)
+  // so they choose folder + filename instead of it silently landing in Downloads. This MUST be
+  // called synchronously from the menu click: showSaveFilePicker() requires transient user
+  // activation, and registerSave() is invoked straight from FileDialog.cpp's EM_ASM during the
+  // click. The handle is used later, once FreeCAD has finished writing the staging file.
+  function pickSaveTarget(path){
+    if(!window.showSaveFilePicker) return null;   // Firefox/Safari -> download fallback
+    var name=path.replace(/^.*\//,'');
+    var ext=(name.match(/\.[^.]+$/)||[''])[0].toLowerCase();
+    var opts={suggestedName:name};
+    if(ext){ var acc={}; acc['application/octet-stream']=[ext];
+      opts.types=[{description:ext.slice(1).toUpperCase()+' file', accept:acc}]; }
+    try{
+      return window.showSaveFilePicker(opts).catch(function(){ return 'cancelled'; });
+    }catch(e){ return null; }
+  }
+  function registerSave(path){
+    if(!ready()) return;
+    var m=window.fcInstance, FS=m.FS, dir=path.replace(/\/[^\/]*$/,'');
+    try{ FS.mkdirTree ? FS.mkdirTree(dir) : FS.mkdir(dir); }catch(e){}
+    if(!(path in pendingSaves)) pendingSaves[path]=null;
+    // Only prompt when we don't already have a destination for this path: FreeCAD calls
+    // getSaveFileName for Save As/Export/first save, then writes the same path on later
+    // Ctrl+S without asking — matching desktop, those re-saves go to the chosen file silently.
+    if(!(path in saveTargets)) saveTargets[path]=pickSaveTarget(path);
+    ensureSaveWatcher();
+  }
+  // Write bytes to the user's chosen file; falls back to a download when the picker is
+  // unavailable (non-Chromium). Returns true if handled, false to use the download path.
+  function writeToTarget(path, bytes){
+    var t=saveTargets[path];
+    if(!t) return false;
+    t.then(function(h){
+      if(!h || h==='cancelled') return;            // user cancelled -> don't write anywhere
+      return Promise.resolve(h.queryPermission && h.queryPermission({mode:'readwrite'}))
+        .then(function(st){ return (st && st!=='granted' && h.requestPermission)
+          ? h.requestPermission({mode:'readwrite'}) : st; })
+        .then(function(){ return h.createWritable(); })
+        .then(function(w){ return Promise.resolve(w.write(bytes)).then(function(){ return w.close(); }); })
+        .then(function(){ logmsg('saved to '+(h.name||path.replace(/^.*\//,''))); })
+        .catch(function(e){ logmsg('save failed: '+e); });
+    });
+    return true;
+  }
+  var saveWatch=null;
+  function ensureSaveWatcher(){
+    if(saveWatch) return;
+    saveWatch=setInterval(function(){
+      if(!ready()) return;
+      var m=window.fcInstance, FS=m.FS;
+      for(var path in pendingSaves){
+        var st; try{ st=FS.stat(path); }catch(e){ continue; }   // not written yet
+        if(!st || !st.size) continue;
+        var sig=st.mtime+':'+st.size, prev=pendingSaves[path];
+        if(prev===sig) continue;                                 // unchanged since last download
+        // wait one tick for a size-stable file (write finished), then download
+        pendingSaves[path]=sig;
+        (function(p,size){
+          var bytes; try{ bytes=FS.readFile(p); }catch(e){ return; }
+          if(bytes.length!==size) { pendingSaves[p]=null; return; } // mid-write; retry next tick
+          // The user has saved real work through File > Save / Save As / Export.
+          try{ window.__fcWorkSaved && window.__fcWorkSaved(); }catch(e){}
+          // Preferred: write straight into the file the user picked in the OS save dialog.
+          if(writeToTarget(p, bytes)) return;
+          // Fallback (no File System Access API): download it.
+          var name=p.replace(/^.*\//,'');
+          var blob=new Blob([bytes],{type:'application/octet-stream'});
+          var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function(){URL.revokeObjectURL(a.href);},15000);
+        })(path,st.size);
+      }
+    },400);
+  }
+  function logmsg(s){ try{ py("import sys; sys.__stderr__.write("+JSON.stringify(s+"\n")+")"); }catch(e){} }
+
+  // Load any freshly-added workbenches under the user Mod dir without a restart: exec each
+  // Init.py / InitGui.py the way FreeCAD's startup does. Best-effort; errors go to the log.
+  function loadUserMods(){
+    py([
+      "import os, sys, FreeCAD, FreeCADGui as Gui",
+      "moddir=os.path.join(FreeCAD.getUserAppDataDir(),'Mod')",
+      "loaded=getattr(FreeCAD,'_fcweb_loaded_mods',None)",
+      "if loaded is None: loaded=FreeCAD._fcweb_loaded_mods=set()",
+      "if os.path.isdir(moddir):",
+      " for name in sorted(os.listdir(moddir)):",
+      "  d=os.path.join(moddir,name)",
+      "  if not os.path.isdir(d) or d in loaded: continue",
+      "  loaded.add(d)",
+      "  if d not in sys.path: sys.path.append(d)",
+      "  for boot in ('Init.py','InitGui.py'):",
+      "   fp=os.path.join(d,boot)",
+      "   if os.path.isfile(fp):",
+      "    try:",
+      "     ns={'__file__':fp,'__name__':'__main__'}; exec(open(fp,encoding='utf-8').read(), ns)",
+      "     sys.__stderr__.write('addon loaded: %s (%s)\\n'%(name,boot))",
+      "    except Exception as e: sys.__stderr__.write('addon %s %s error: %s\\n'%(name,boot,e))"
+    ].join('\n'));
+  }
+
+  function installWorkbenchZip(path){
+    logmsg('installing workbench from '+path.replace(/^.*\//,'')+' ...');
+    py([
+      "import os, zipfile, FreeCAD",
+      "src="+JSON.stringify(path),
+      "moddir=os.path.join(FreeCAD.getUserAppDataDir(),'Mod')",
+      "os.makedirs(moddir, exist_ok=True)",
+      "wbname=os.path.splitext(os.path.basename(src))[0] or 'CustomWB'",
+      "try:",
+      "  with zipfile.ZipFile(src) as z:",
+      "    names=[n for n in z.namelist() if not n.startswith('/') and '..' not in n and not n.endswith('/')]",
+      "    # A workbench must live in its OWN dir under Mod/. If every entry already shares a single",
+      "    # top-level folder, keep it as-is (Mod/<top>/...). If the zip is flat, wrap it in Mod/<wbname>/.",
+      "    tops=set(n.split('/')[0] for n in names)",
+      "    flat = not all('/' in n for n in names) or len(tops)!=1",
+      "    for n in names:",
+      "      rel = (wbname+'/'+n) if flat else n",
+      "      dst=os.path.join(moddir, rel)",
+      "      os.makedirs(os.path.dirname(dst), exist_ok=True)",
+      "      with z.open(n) as fsrc, open(dst,'wb') as fdst: fdst.write(fsrc.read())",
+      "    FreeCAD.Console.PrintMessage('workbench extracted to %s\\n'%moddir)",
+      "except Exception as e:",
+      "  import sys; sys.__stderr__.write('zip install error: %s\\n'%e)"
+    ].join('\n'));
+    loadUserMods();
+  }
+
+  // Browser-native addon install from GitHub: no git/subprocess (unavailable in wasm). Uses the
+  // GitHub REST tree API + raw.githubusercontent (both send CORS *), so it works from the page.
+  // Only codeload zipballs lack CORS, which we avoid by fetching individual files.
+  async function installAddonFromGitHub(spec){
+    if(!ready()){ logmsg('not ready'); return; }
+    var mm=spec.replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,'').split('/');
+    var owner=mm[0], repo=mm[1]; if(!owner||!repo){ logmsg('bad repo spec: '+spec); return; }
+    logmsg('fetching '+owner+'/'+repo+' from GitHub ...');
+    try{
+      var meta=await (await fetch('https://api.github.com/repos/'+owner+'/'+repo)).json();
+      var branch=meta.default_branch||'master';
+      var tree=await (await fetch('https://api.github.com/repos/'+owner+'/'+repo+'/git/trees/'+branch+'?recursive=1')).json();
+      if(!tree.tree){ logmsg('could not list files (rate limited?)'); return; }
+      var files=tree.tree.filter(function(t){return t.type==='blob';});
+      if(tree.truncated) logmsg('note: large repo, file list truncated by GitHub');
+      if(files.length>1200){ logmsg('repo has '+files.length+' files — too large to install in-browser; aborting'); return; }
+      var m=window.fcInstance, FS=m.FS;
+      // resolve the real user Mod dir from FreeCAD (don't assume the XDG path)
+      py("import os, FreeCAD\nopen('/tmp/_fcmoddir','w').write(os.path.join(FreeCAD.getUserAppDataDir(),'Mod'))");
+      var moddir='/home/web_user/.local/share/FreeCAD/Mod';
+      try{ moddir=new TextDecoder().decode(FS.readFile('/tmp/_fcmoddir'))||moddir; }catch(e){}
+      var base=moddir+'/'+repo;
+      try{ FS.mkdirTree(base); }catch(e){}
+      var n=0;
+      for(var i=0;i<files.length;i++){
+        var fp=files[i].path;
+        var r=await fetch('https://raw.githubusercontent.com/'+owner+'/'+repo+'/'+branch+'/'+fp);
+        if(!r.ok) continue;
+        var bytes=new Uint8Array(await r.arrayBuffer());
+        var dst=base+'/'+fp, d=dst.replace(/\/[^\/]*$/,'');
+        try{ FS.mkdirTree(d); }catch(e){}
+        FS.writeFile(dst, bytes); n++;
+        if(n%15===0) logmsg('  '+n+'/'+files.length+' files...');
+      }
+      logmsg('downloaded '+n+' files -> Mod/'+repo);
+      loadUserMods();
+    }catch(e){ logmsg('addon install failed: '+e); }
+  }
+
+  window.fcwebDownload=download; window.fcwebOpen=openFile; window.fcwebRegisterSave=registerSave;
+  window.fcInstallAddon=installAddonFromGitHub; window.fcLoadUserMods=loadUserMods;
+  window.fcInstallWorkbenchZip=installWorkbenchZip;
+
+  // Bridge FreeCAD.installAddon('owner/repo') (Python console) -> the JS GitHub fetcher.
+  setInterval(function(){
+    if(!ready()) return;
+    var FS=window.fcInstance.FS, spec;
+    try{ spec=new TextDecoder().decode(FS.readFile('/tmp/_fcaddonreq')).trim(); }catch(e){ return; }
+    try{ FS.unlink('/tmp/_fcaddonreq'); }catch(e){}
+    if(spec) installAddonFromGitHub(spec);
+  },700);
+
+  // Ctrl+S / Ctrl+O convenience -> same bridge (capture phase so a stray native dialog never runs)
+  window.addEventListener('keydown',function(e){
+    var k=(e.key||'').toLowerCase();
+    if((e.metaKey||e.ctrlKey)&&k==='s'){ e.preventDefault(); e.stopImmediatePropagation(); download(); }
+    else if((e.metaKey||e.ctrlKey)&&k==='o'){ e.preventDefault(); e.stopImmediatePropagation(); openFile(); }
+    else if(k==='escape'){ closeActivePopup(); }
+  },true);
+
+  // ---- keyboard outside text fields -----------------------------------------
+  // Measured on this build: Qt receives keys ONLY while a text widget has focus. With the
+  // model tree focused an application-wide Qt event filter sees NOTHING -- so Delete does
+  // not delete (the Std_Delete action is enabled and the command works when invoked
+  // directly), Ctrl+Z does not undo, and no single-key shortcut fires. Qt-wasm focuses a
+  // hidden DOM input only for text widgets; otherwise document.activeElement is BODY and
+  // the keydown never enters Qt.
+  //
+  // Re-dispatching the same event onto Qt's own canvas DOES drive it (verified: the object
+  // was deleted), so forward there instead of hard-coding a shortcut table -- every key
+  // keeps whatever meaning FreeCAD gives it.
+  function qtCanvas(){
+    try{
+      var hosts=[].slice.call(document.querySelectorAll('*')).filter(function(e){return e.shadowRoot;});
+      for(var i=0;i<hosts.length;i++){
+        var c=hosts[i].shadowRoot.querySelector('canvas');
+        if(c) return c;
+      }
+    }catch(e){}
+    return null;
+  }
+  function textHasFocus(){
+    var d=document.activeElement;
+    while(d && d.shadowRoot && d.shadowRoot.activeElement) d=d.shadowRoot.activeElement;
+    if(!d) return false;
+    var t=d.tagName;
+    return t==='INPUT' || t==='TEXTAREA' || d.isContentEditable === true;
+  }
+  function forwardKeyToQt(e){
+    // isTrusted is the loop guard: our re-dispatched copy is synthetic, so it is ignored
+    // here and cannot bounce. Skip when a text field has focus -- Qt already gets those,
+    // and forwarding would type every character twice.
+    if(!e.isTrusted) return;
+    if(e.metaKey || e.ctrlKey){
+      var k=(e.key||'').toLowerCase();
+      if(k==='s'||k==='o') return;          // handled by the shell above
+    }
+    if(textHasFocus()) return;
+    var c=qtCanvas(); if(!c) return;
+    c.dispatchEvent(new KeyboardEvent(e.type, {
+      key:e.key, code:e.code, keyCode:e.keyCode, which:e.which, location:e.location,
+      ctrlKey:e.ctrlKey, shiftKey:e.shiftKey, altKey:e.altKey, metaKey:e.metaKey,
+      repeat:e.repeat, isComposing:e.isComposing, bubbles:true, cancelable:true, composed:true
+    }));
+  }
+  window.addEventListener('keydown', forwardKeyToQt, true);
+  window.addEventListener('keyup', forwardKeyToQt, true);
+
+  // Escape closes an open menu. Measured on this Qt-wasm build: with a popup open the
+  // key never enters Qt's event system at all -- an application-wide Qt event filter
+  // installed on QApplication does NOT see it, though the same filter sees Escape fine
+  // when no popup is open, and typing works normally. So Qt cannot fix this from inside;
+  // the shell has to notice the key and ask Qt to close the popup.
+  // Deliberately narrow: does nothing unless a popup is actually open, so Escape keeps
+  // its normal meaning everywhere else (task dialogs, Sketcher tools). Nested submenus
+  // close one level per press, as on desktop.
+  function closeActivePopup(){
+    try{
+      var m=window.fcInstance; if(!window.__fcAppReady||!m||!m._malloc) return;
+      if(window.__fcPyBusy) return;           // never re-enter a running interpreter
+      var code="from PySide6 import QtWidgets as _W\n"
+             + "_w=_W.QApplication.activePopupWidget()\n"
+             + "\nif _w is not None:\n    _w.close()\n";
+      var n=new TextEncoder().encode(code).length+1;
+      var q=m._malloc(n); m.stringToUTF8(code,q,n);
+      (window.fcRunPy||function(mm,pp){mm._fcweb_run_python(pp);mm._free(pp);})(m,q);
+    }catch(err){}
+  }
+})();
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3455edeed238f6c',t:'MTc4ODI3NzE5Ng=='};var a=document.createElement('script');a.src='./cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body></html>

@@ -1,0 +1,20 @@
+{
+    "file":  "FreeCAD.data.gz",
+    "size":  204478916,
+    "sha256":  "24a1b731cb4c276aefab3c8a5a96deda75171aefd473047029e0f57776285961",
+    "chunkSize":  95000000,
+    "parts":  [
+                  {
+                      "name":  "part-000",
+                      "size":  95000000
+                  },
+                  {
+                      "name":  "part-001",
+                      "size":  95000000
+                  },
+                  {
+                      "name":  "part-002",
+                      "size":  14478916
+                  }
+              ]
+}

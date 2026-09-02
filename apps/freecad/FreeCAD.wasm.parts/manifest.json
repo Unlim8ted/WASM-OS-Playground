@@ -1,0 +1,16 @@
+{
+    "file":  "FreeCAD.wasm",
+    "size":  183499419,
+    "sha256":  "c6bc0c950c7119e57ff12367942a0f7981b3a77563bcfb90e7865568c00548ed",
+    "chunkSize":  95000000,
+    "parts":  [
+                  {
+                      "name":  "part-000",
+                      "size":  95000000
+                  },
+                  {
+                      "name":  "part-001",
+                      "size":  88499419
+                  }
+              ]
+}
