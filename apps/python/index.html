@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Python</title>
+<style>
+:root{--bg:#0d1117;--panel:#151a21;--panel2:#10141a;--line:#2a313b;--text:#e7ecf3;--muted:#8792a1;--accent:#78a6ff;--good:#65d69d;--bad:#ff7b7b}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--text);font:13px Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,textarea{font:inherit}
+.app{height:100%;display:grid;grid-template-rows:42px minmax(0,1fr) 170px}
+.bar{display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+.title{font-weight:700;margin-right:auto}
+.status{color:var(--muted);font-size:12px;min-width:160px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button{height:28px;border:1px solid var(--line);border-radius:6px;background:#1b222c;color:var(--text);padding:0 10px;cursor:pointer}
+button:hover{background:#232b37}
+button.primary{border-color:transparent;background:var(--accent);color:#08111f;font-weight:700}
+button:disabled{opacity:.55;cursor:default}
+textarea{width:100%;height:100%;resize:none;border:0;outline:0;padding:12px;background:var(--panel2);color:var(--text);font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4}
+.out{border-top:1px solid var(--line);background:#080b10;display:flex;flex-direction:column;min-height:0}
+.outbar{height:28px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid #1e242d;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase}
+pre{margin:0;padding:9px 10px;white-space:pre-wrap;overflow:auto;flex:1;color:#dbe4ef;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.ok{color:var(--good)}.err{color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar">
+    <div class="title">Python</div>
+    <button id="install">Install</button>
+    <button id="run" class="primary">Run</button>
+    <div id="status" class="status">Checking...</div>
+  </div>
+  <textarea id="code" spellcheck="false">print("Hello from Unlim8ted Python")</textarea>
+  <div class="out">
+    <div class="outbar">Output</div>
+    <pre id="output"></pre>
+  </div>
+</div>
+<script>
+const code = document.getElementById("code");
+const output = document.getElementById("output");
+const statusEl = document.getElementById("status");
+const installBtn = document.getElementById("install");
+const runBtn = document.getElementById("run");
+const pending = new Map();
+let installed = false;
+
+const saved = localStorage.getItem("u8-python-code");
+if (saved) code.value = saved;
+code.addEventListener("input", () => localStorage.setItem("u8-python-code", code.value));
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = "status" + (cls ? " " + cls : "");
+}
+
+function request(type, payload = {}, timeout = 240000) {
+  const requestId = Math.random().toString(36).slice(2);
+  parent.postMessage({ type, requestId, ...payload }, "*");
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pending.delete(requestId);
+      reject(Error("Timed out waiting for the OS"));
+    }, timeout);
+    pending.set(requestId, { resolve, reject, timer });
+  });
+}
+
+async function checkPython() {
+  try {
+    const result = await request("unlim8ted-python-check", {}, 90000);
+    installed = !!result.installed;
+    installBtn.textContent = installed ? "Installed" : "Install";
+    setStatus(installed ? "Ready" : "Not installed", installed ? "ok" : "");
+  } catch (error) {
+    setStatus(error.message || String(error), "err");
+  }
+}
+
+async function installPython() {
+  installBtn.disabled = true;
+  runBtn.disabled = true;
+  setStatus("Installing...");
+  output.textContent = "";
+  try {
+    const result = await request("unlim8ted-python-install", {}, 20 * 60 * 1000);
+    if (!result.ok) throw Error(result.error || "Install failed");
+    installed = true;
+    installBtn.textContent = "Installed";
+    setStatus("Ready", "ok");
+  } catch (error) {
+    setStatus(error.message || String(error), "err");
+  } finally {
+    installBtn.disabled = false;
+    runBtn.disabled = false;
+  }
+}
+
+function runPython() {
+  output.textContent = "";
+  runBtn.disabled = true;
+  setStatus(installed ? "Running..." : "Installing...");
+  parent.postMessage({ type: "unlim8ted-python-run", code: code.value }, "*");
+}
+
+window.addEventListener("message", e => {
+  const d = e.data || {};
+  if (d.type === "unlim8ted-python-status") {
+    setStatus(String(d.text || ""));
+    return;
+  }
+  if (d.type === "unlim8ted-python-output") {
+    output.textContent = d.text || "";
+    runBtn.disabled = false;
+    installed = d.ok || installed;
+    installBtn.textContent = installed ? "Installed" : "Install";
+    setStatus(d.ok ? "Finished" : "Failed", d.ok ? "ok" : "err");
+    return;
+  }
+  if (!d.requestId || !pending.has(d.requestId)) return;
+  const p = pending.get(d.requestId);
+  pending.delete(d.requestId);
+  clearTimeout(p.timer);
+  p.resolve(d);
+});
+
+installBtn.addEventListener("click", installPython);
+runBtn.addEventListener("click", runPython);
+checkPython();
+</script>
+</body>
+</html>
