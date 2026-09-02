@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blender in the Browser — Puter Labs</title>
+    <meta
+      name="description"
+      content="Blender compiled to WebAssembly with a WebGPU backend. The real Blender interface, rendering entirely inside a browser tab — no install, no plugins."
+    />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- Open Graph / Facebook / Slack / Discord -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Puter Labs" />
+    <meta property="og:title" content="Blender in the Browser" />
+    <meta
+      property="og:description"
+      content="Blender compiled to WebAssembly with a WebGPU backend. The real Blender interface, rendering entirely inside a browser tab — no install, no plugins."
+    />
+    <meta property="og:image" content="https://developer.puter.com/labs/blender-web/blender-browser-card-354898ad.png" />
+    <meta property="og:image:width" content="2400" />
+    <meta property="og:image:height" content="1260" />
+    <meta property="og:image:alt" content="Blender in the Browser — Blender running in a browser tab at developer.puter.com/labs/blender" />
+
+    <!-- X / Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Blender in the Browser" />
+    <meta
+      name="twitter:description"
+      content="Blender in the Browser: Compiled to WebAssembly with a WebGPU backend. The real Blender interface, rendering entirely inside a browser tab — no install, no plugins."
+    />
+    <meta name="twitter:image" content="https://developer.puter.com/labs/blender-web/blender-browser-card-354898ad.png" />
+    <meta name="twitter:image:alt" content="Blender in the Browser — Blender running in a browser tab at developer.puter.com/labs/blender" />
+
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <script async src="https://plausible.io/js/pa-k6ilPWiCwLaAeuy_X0NVc.js"></script>
+    <script>
+      window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+      plausible.init()
+    </script>
+    <script type="module" crossorigin src="./assets/index-ik7j_WkV.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C7fpELON.css">
+
+    <style id="unlim8ted-blender-autostart">
+      html,body{background:#181818!important;overflow:hidden!important}
+      #blender-loader{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;background:#181818;color:#d8d8d8;font-family:Arial,sans-serif;transition:opacity .28s ease,visibility .28s ease}
+      #blender-loader.done{opacity:0;visibility:hidden;pointer-events:none}
+      #blender-log-rain{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;opacity:.22}
+      #blender-log-text{position:absolute;left:3%;right:3%;top:-10%;white-space:pre-wrap;word-break:break-word;color:#aaa;font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;animation:bl-log-scroll 18s linear infinite}
+      .bl-load-inner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:24px}
+      .bl-mark{width:82px;height:82px;position:relative;animation:bl-float 1.8s ease-in-out infinite}
+      .bl-ring{position:absolute;inset:8px;border:8px solid #e87d0d;border-left-color:transparent;border-radius:50%;animation:bl-spin 1.05s linear infinite}
+      .bl-eye{position:absolute;width:24px;height:24px;left:29px;top:29px;border-radius:50%;background:#265787;box-shadow:0 0 0 7px #fff,0 0 0 12px #e87d0d}
+      .bl-dots{height:5px;display:flex;align-items:center;justify-content:center;gap:9px}
+      .bl-dot{width:5px;height:5px;border-radius:50%;background:#e87d0d;animation:bl-pulse 1.1s ease-in-out infinite}
+      .bl-dot:nth-child(2){animation-delay:.14s}.bl-dot:nth-child(3){animation-delay:.28s}
+      @keyframes bl-spin{to{transform:rotate(360deg)}}
+      @keyframes bl-float{50%{transform:translateY(-4px)}}
+      @keyframes bl-pulse{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+      @keyframes bl-log-scroll{from{transform:translateY(-5%)}to{transform:translateY(110%)}}
+      @media (prefers-reduced-motion:reduce){.bl-mark,.bl-ring,.bl-dot,#blender-log-text{animation:none}}
+    </style>
+  </head>
+  <body>
+    <div id="blender-loader" aria-label="Loading Blender" role="status">
+      <div id="blender-log-rain" aria-hidden="true"><pre id="blender-log-text"></pre></div>
+      <div class="bl-load-inner">
+        <div class="bl-mark" aria-hidden="true"><div class="bl-ring"></div><div class="bl-eye"></div></div>
+        <div class="bl-dots" aria-hidden="true"><i class="bl-dot"></i><i class="bl-dot"></i><i class="bl-dot"></i></div>
+      </div>
+    </div>
+
+    <section id="splash" aria-live="polite">
+      <header class="top-nav">
+        <div class="nav-left">
+          <a class="nav-brand" href="https://puter.com" target="_blank" rel="noreferrer" aria-label="Puter">
+            <img
+              src="data:image/svg+xml,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22utf-8%22%3F%3E%3Csvg%20x%3D%220px%22%20y%3D%220px%22%20width%3D%2248px%22%20height%3D%2248px%22%20viewBox%3D%220%200%2048%2048%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20stroke-width%3D%222%22%20transform%3D%22matrix(0%2C%201%2C%20-1%2C%200%2C%2047.999504%2C%200.000014)%22%3E%3Cpolyline%20points%3D%2239%2024%2025%2024%2025%2028%22%20fill%3D%22none%22%20stroke%3D%22%23444444%22%20stroke-linecap%3D%22square%22%20stroke-miterlimit%3D%2210%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22miter%22%2F%3E%3Cpolyline%20points%3D%2235.879%2010.121%2032%2014%2025%2014%2025%2018%22%20fill%3D%22none%22%20stroke%3D%22%23444444%22%20stroke-linecap%3D%22square%22%20stroke-miterlimit%3D%2210%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22miter%22%2F%3E%3Cpath%20d%3D%22M13%2C26a10.29%2C10.29%2C0%2C0%2C1-7.2-3%22%20fill%3D%22none%22%20stroke%3D%22%23444444%22%20stroke-linecap%3D%22square%22%20stroke-miterlimit%3D%2210%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22miter%22%2F%3E%3Cpath%20d%3D%22M17%2C31.6A5.826%2C5.826%2C0%2C0%2C1%2C13%2C26a5.731%2C5.731%2C0%2C0%2C1%2C2-4.4%22%20fill%3D%22none%22%20stroke%3D%22%23444444%22%20stroke-linecap%3D%22square%22%20stroke-miterlimit%3D%2210%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22miter%22%2F%3E%3Cpath%20d%3D%22M35.879%2C37.879%2C32%2C34H25v2A9.9%2C9.9%2C0%2C0%2C1%2C15%2C46%2C9.9%2C9.9%2C0%2C0%2C1%2C5%2C36a9.058%2C9.058%2C0%2C0%2C1%2C.6-3.2A5.627%2C5.627%2C0%2C0%2C1%2C3%2C28a5.888%2C5.888%2C0%2C0%2C1%2C2.8-5A9.994%2C9.994%2C0%2C0%2C1%2C3%2C16%2C9.9%2C9.9%2C0%2C0%2C1%2C13%2C6h.4A5.826%2C5.826%2C0%2C0%2C1%2C19%2C2a5.893%2C5.893%2C0%2C0%2C1%2C6%2C6%22%20fill%3D%22none%22%20stroke%3D%22%23444444%22%20stroke-linecap%3D%22square%22%20stroke-miterlimit%3D%2210%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22miter%22%2F%3E%3Ccircle%20cx%3D%2238%22%20cy%3D%228%22%20r%3D%223%22%20fill%3D%22none%22%20stroke%3D%22%23444444%22%20stroke-linecap%3D%22square%22%20stroke-miterlimit%3D%2210%22%20stroke-width%3D%222%22%20data-color%3D%22color-2%22%20stroke-linejoin%3D%22miter%22%2F%3E%3Ccircle%20cx%3D%2242%22%20cy%3D%2224%22%20r%3D%223%22%20fill%3D%22none%22%20stroke%3D%22%23444444%22%20stroke-linecap%3D%22square%22%20stroke-miterlimit%3D%2210%22%20stroke-width%3D%222%22%20data-color%3D%22color-2%22%20stroke-linejoin%3D%22miter%22%2F%3E%3Ccircle%20cx%3D%2238%22%20cy%3D%2240%22%20r%3D%223%22%20fill%3D%22none%22%20stroke%3D%22%23444444%22%20stroke-linecap%3D%22square%22%20stroke-miterlimit%3D%2210%22%20stroke-width%3D%222%22%20data-color%3D%22color-2%22%20stroke-linejoin%3D%22miter%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"
+              alt="Puter"
+              height="30"
+            />
+          </a>
+          <a class="nav-brand-label" href="https://developer.puter.com/" target="_blank" rel="noreferrer">
+            Puter <span class="labs-badge">Labs</span>
+          </a>
+        </div>
+        <div class="nav-links">
+          <a class="nav-link" href="https://github.com/heyputer/blender-wasm" target="_blank" rel="noreferrer">
+            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+            </svg>
+            GitHub
+          </a>
+        </div>
+      </header>
+      <main class="stage">
+        <div id="splash-shell" class="stage-inner" data-phase="loading">
+          <div class="logo-lockup">
+            <span class="logo-tile blender-tile">
+              <svg class="project-logo" viewBox="0 0 1024 1024" role="img" aria-label="Blender">
+                <g transform="translate(75, 151)" fill-rule="evenodd">
+                  <path d="M330.261615,379.121192 C333.322374,324.466765 360.060704,276.315376 400.399199,242.181648 C439.958067,208.654871 493.203725,188.163073 551.300398,188.163073 C609.339321,188.163073 662.584979,208.654871 702.172722,242.181648 C742.482342,276.315376 769.220672,324.466765 772.310306,379.063388 C775.371065,435.22074 752.819623,487.389562 713.260755,526.060965 C672.92226,565.397124 615.547464,590.079769 551.300398,590.079769 C487.053332,590.079769 429.563036,565.397124 389.253416,526.060965 C349.665673,487.389562 327.171981,435.22074 330.261615,379.121192 Z" fill="#FFFFFF"/>
+                  <path d="M257.285355,440.691838 C257.477963,451.666033 260.974535,472.991563 266.219392,489.645646 C277.242482,524.89654 295.94025,557.507695 321.957113,586.248222 C348.655511,615.789569 381.532174,639.517558 419.505533,656.36443 C459.419787,674.056612 502.667636,683.073248 547.589691,682.999552 C592.437666,682.939778 635.685515,673.745182 675.599768,655.91953 C713.573128,638.909528 746.420158,615.077729 773.074108,585.521552 C799.076155,556.662385 817.744292,523.99191 828.797014,488.741016 C834.353007,470.930194 837.864394,452.852432 839.271912,434.715351 C840.649799,416.845209 840.071975,398.945407 837.538443,381.060435 C832.589905,346.209951 820.544512,313.509815 801.994904,283.701529 C785.030605,256.310531 763.162217,232.330432 737.16017,212.146811 L737.219434,212.102321 L474.813591,10.4292426 C474.576535,10.2512827 474.383928,10.0584928 474.132056,9.89536284 C456.915886,-3.33299117 427.965459,-3.28850119 409.030635,9.96951281 C389.888387,23.3758267 387.695622,45.5466667 404.734,59.5313504 L404.65992,59.6055003 L514.105573,148.68927 L180.523757,149.04519 L180.079277,149.04519 C152.506736,149.07485 126.000946,167.182272 120.756089,190.064951 C115.363071,213.377701 134.090472,232.716012 162.759395,232.819822 L162.714947,232.923632 L331.794925,232.597372 L30.0822837,464.404997 C29.6970682,464.686767 29.2822207,464.983367 28.9266372,465.265137 C0.465137302,487.080057 -8.73558702,523.35422 9.19175022,546.31105 C27.3857751,569.65346 66.070302,569.69795 94.8281215,546.44452 L259.492936,411.550901 C259.492936,411.550901 257.092747,429.762133 257.285355,440.691838 Z M680.414962,501.67277 C646.486365,536.271145 598.986329,555.891226 547.589691,555.99534 C496.118972,556.084016 448.618936,536.641894 414.690339,502.10284 C398.111256,485.270798 385.93252,465.902826 378.420817,445.274306 C371.057275,425.001705 368.19779,403.483385 370.094236,381.772275 C371.88697,360.550554 378.198578,340.307613 388.273445,321.992572 C398.17052,303.98896 411.801223,287.720457 428.632178,273.958223 C461.612552,247.056616 503.601043,232.493562 547.515611,232.43406 C591.474627,232.374922 633.433486,246.804506 666.443492,273.617133 C683.244814,287.320047 696.860701,303.52923 706.757777,321.503182 C716.877092,339.803394 723.144252,359.972184 725.011065,381.253225 C726.877879,402.934675 724.018395,424.423335 716.654852,444.710766 C709.128334,465.398607 696.994045,484.766578 680.414962,501.67277 Z" fill="#E87D0D" fill-rule="nonzero"/>
+                  <path d="M437.892166,384.026434 C439.46266,355.982916 453.182259,331.276147 473.880184,313.761925 C494.178078,296.559133 521.498748,286.044668 551.308502,286.044668 C581.088624,286.044668 608.409293,296.559133 628.722004,313.761925 C649.405113,331.276147 663.124712,355.982916 664.710022,383.996774 C666.280516,412.811451 654.709235,439.579588 634.41134,459.422119 C613.713415,479.60574 584.27406,492.270555 551.308502,492.270555 C518.342944,492.270555 488.844325,479.60574 468.161216,459.422119 C447.848505,439.579588 436.306856,412.811451 437.892166,384.026434 Z" fill="#265787"/>
+                </g>
+              </svg>
+            </span>
+            <span class="logo-x" aria-hidden="true">&times;</span>
+            <span class="logo-tile wasm-tile">
+              <svg class="wasm-mark" viewBox="97.43 0 107.62 107.62" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WebAssembly">
+                <rect x="97.43" y="0" width="107.62" height="107.62" fill="#fff" />
+                <path fill="#654ff0" transform="translate(-0.21)" d="M163.76,0c0,.19,0,.38,0,.58a12.34,12.34,0,0,1-24.68,0c0-.2,0-.39,0-.58H97.64V107.62H205.26V0ZM149,96.1l-5.24-25.93h-.09L138,96.1h-7.22L122.6,58h7.13l4.88,25.93h.09L140.58,58h6.67l5.28,26.25h.09L158.19,58h7L156.1,96.1Zm39.26,0-2.43-8.48H173l-1.87,8.48H164L173.22,58h11.25l11.21,38.1Z" />
+                <polygon fill="#654ff0" transform="translate(-0.21)" points="177.3 67.39 174.19 81.37 183.87 81.37 180.3 67.39 177.3 67.39" />
+              </svg>
+            </span>
+          </div>
+          <h1 id="project-title" class="splash-title">Blender in the Browser</h1>
+          <p class="project-copy">
+            Blender compiled to WebAssembly with a WebGPU backend.<br />
+            The real Blender interface, rendering entirely inside this browser tab.
+          </p>
+
+          <div id="stage-card" class="launch-panel" data-phase="loading">
+            <div class="panel-loading" aria-label="Loading Blender">
+              <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="progress-fill" class="progress-fill"></div>
+              </div>
+              <div class="progress-meta">
+                <span id="progress-phase">Preparing</span>
+                <span id="progress-percent"></span>
+              </div>
+              <p id="splash-status" class="splash-status">Preparing Blender…</p>
+            </div>
+
+            <div class="panel-ready" aria-label="Launch">
+              <button id="start-btn" type="button" class="start-btn">Launch Blender</button>
+              <p id="webgpu-note" class="jspi-note" hidden></p>
+            </div>
+
+            <!-- GPU status: populated early (before downloads finish) by the
+                 adapter probe. Shown only when WebGPU is missing or falls back
+                 to a software renderer; the acknowledgement checkbox gates the
+                 Launch button in that case. -->
+            <div id="gpu-warning" class="gpu-warning" hidden>
+              <p id="gpu-warning-text" class="gpu-warning-text"></p>
+              <label id="gpu-ack-row" class="gpu-ack-row" hidden>
+                <input type="checkbox" id="gpu-ack" />
+                <span>Launch anyway with software rendering — expect it to be extremely slow.</span>
+              </label>
+            </div>
+          </div>
+
+          <section class="startup-console" aria-label="Startup console">
+            <p class="phase-kicker">Startup log</p>
+            <div id="console-output" class="console-box" role="log" aria-label="Startup console output"></div>
+          </section>
+        </div>
+      </main>
+    </section>
+    <canvas id="canvas" width="1536" height="864" tabindex="0"></canvas>
+
+  <script id="unlim8ted-blender-autostart-script">
+    (() => {
+      "use strict";
+
+      /*
+       * ------------------------------------------------------------
+       * SETTINGS
+       * ------------------------------------------------------------
+       *
+       * The old version clicked Start on the first possible frame.
+       *
+       * That can cause the memory used while downloading/preparing
+       * Blender to overlap with the large WASM/WebGPU allocation.
+       *
+       * 500 ms is intentionally short enough to still feel instant,
+       * while allowing the browser to finish pending work first.
+       *
+       * If your machine still OOMs, try:
+       *
+       *   750
+       *   1000
+       *   1500
+       *
+       * before changing anything else.
+       */
+
+      const START_DELAY_MS = 500;
+
+      /*
+       * Don't copy an enormous console into the animation.
+       * This is only decorative.
+       */
+      const MAX_LOG_LINES = 36;
+
+      /*
+       * Don't rebuild the decorative log more frequently than this.
+       */
+      const LOG_UPDATE_DELAY = 120;
+
+
+      /*
+       * ------------------------------------------------------------
+       * STATE
+       * ------------------------------------------------------------
+       */
+
+      let launched = false;
+      let destroyed = false;
+
+      let readyObserver = null;
+      let logObserver = null;
+      let splashObserver = null;
+
+      let startTimeout = 0;
+      let logTimeout = 0;
+
+      let loader = null;
+      let logText = null;
+      let consoleOutput = null;
+
+      let stageCard = null;
+      let splashShell = null;
+      let splash = null;
+      let startButton = null;
+      let gpuAck = null;
+
+
+      /*
+       * ------------------------------------------------------------
+       * HELPERS
+       * ------------------------------------------------------------
+       */
+
+      function nextFrame() {
+        return new Promise(resolve => {
+          requestAnimationFrame(() => resolve());
+        });
+      }
+
+
+      function cacheElements() {
+        loader =
+          loader ||
+          document.getElementById("blender-loader");
+
+        logText =
+          logText ||
+          document.getElementById("blender-log-text");
+
+        consoleOutput =
+          document.getElementById("console-output");
+
+        stageCard =
+          document.getElementById("stage-card");
+
+        splashShell =
+          document.getElementById("splash-shell");
+
+        splash =
+          document.getElementById("splash");
+
+        startButton =
+          document.getElementById("start-btn");
+
+        gpuAck =
+          document.getElementById("gpu-ack");
+      }
+
+
+      function isReady() {
+        cacheElements();
+
+        return (
+          stageCard?.dataset.phase === "ready" ||
+          splashShell?.dataset.phase === "ready"
+        );
+      }
+
+
+      function splashIsGone() {
+        cacheElements();
+
+        if (!splash) {
+          return false;
+        }
+
+        if (splash.hidden) {
+          return true;
+        }
+
+        /*
+         * Only perform getComputedStyle when we actually need to test
+         * the splash. The old code did this every 100 ms forever until
+         * Blender appeared.
+         */
+        const style = getComputedStyle(splash);
+
+        return (
+          style.display === "none" ||
+          style.visibility === "hidden"
+        );
+      }
+
+
+      /*
+       * ------------------------------------------------------------
+       * DECORATIVE LOG
+       * ------------------------------------------------------------
+       *
+       * The previous implementation rebuilt the entire log text on
+       * every single console DOM mutation.
+       *
+       * Blender startup can produce a lot of mutations very quickly.
+       * That means:
+       *
+       *   innerText
+       *   split()
+       *   filter()
+       *   slice()
+       *   join()
+       *   textContent replacement
+       *
+       * could all happen repeatedly during the most memory-intensive
+       * part of startup.
+       *
+       * This version throttles those updates.
+       */
+
+      function updateDecorativeLog() {
+        logTimeout = 0;
+
+        if (
+          destroyed ||
+          launched ||
+          !consoleOutput ||
+          !logText
+        ) {
+          return;
+        }
+
+        const raw =
+          consoleOutput.textContent ||
+          "";
+
+        if (!raw) {
+          return;
+        }
+
+        /*
+         * Avoid filter(Boolean), which creates another temporary array.
+         */
+        const allLines = raw.split(/\n+/);
+
+        const start = Math.max(
+          0,
+          allLines.length - MAX_LOG_LINES
+        );
+
+        let output = "";
+
+        for (
+          let i = start;
+          i < allLines.length;
+          i++
+        ) {
+          const line = allLines[i];
+
+          if (!line) {
+            continue;
+          }
+
+          if (output) {
+            output += "\n";
+          }
+
+          output += line;
+        }
+
+        /*
+         * Don't mutate the DOM when the displayed value hasn't changed.
+         */
+        if (logText.textContent !== output) {
+          logText.textContent = output;
+        }
+      }
+
+
+      function scheduleDecorativeLogUpdate() {
+        if (
+          launched ||
+          destroyed ||
+          logTimeout
+        ) {
+          return;
+        }
+
+        logTimeout = window.setTimeout(
+          updateDecorativeLog,
+          LOG_UPDATE_DELAY
+        );
+      }
+
+
+      function stopLogMirroring() {
+        if (logObserver) {
+          logObserver.disconnect();
+          logObserver = null;
+        }
+
+        if (logTimeout) {
+          clearTimeout(logTimeout);
+          logTimeout = 0;
+        }
+
+        /*
+         * Release our decorative copy before Blender allocates
+         * its large runtime memory.
+         */
+        if (logText) {
+          logText.textContent = "";
+        }
+
+        /*
+         * Important:
+         * Do NOT clear #console-output itself.
+         *
+         * It belongs to the Blender application and the original
+         * bundle may still expect it to exist.
+         */
+        consoleOutput = null;
+      }
+
+
+      function startLogMirroring() {
+        cacheElements();
+
+        if (
+          !consoleOutput ||
+          !logText ||
+          logObserver
+        ) {
+          return;
+        }
+
+        updateDecorativeLog();
+
+        logObserver = new MutationObserver(
+          scheduleDecorativeLogUpdate
+        );
+
+        logObserver.observe(
+          consoleOutput,
+          {
+            childList: true,
+            subtree: true,
+            characterData: true
+          }
+        );
+      }
+
+
+      /*
+       * ------------------------------------------------------------
+       * READY OBSERVERS
+       * ------------------------------------------------------------
+       *
+       * We only observe the tiny set of nodes relevant to startup.
+       *
+       * We intentionally DO NOT observe:
+       *
+       *   document.documentElement
+       *
+       * with subtree:true.
+       */
+
+      function stopReadyObservers() {
+        if (readyObserver) {
+          readyObserver.disconnect();
+          readyObserver = null;
+        }
+      }
+
+
+      function watchReadyState() {
+        cacheElements();
+
+        if (readyObserver) {
+          return;
+        }
+
+        readyObserver =
+          new MutationObserver(() => {
+            maybeLaunch();
+          });
+
+        if (stageCard) {
+          readyObserver.observe(
+            stageCard,
+            {
+              attributes: true,
+              attributeFilter: [
+                "data-phase"
+              ]
+            }
+          );
+        }
+
+        if (
+          splashShell &&
+          splashShell !== stageCard
+        ) {
+          readyObserver.observe(
+            splashShell,
+            {
+              attributes: true,
+              attributeFilter: [
+                "data-phase"
+              ]
+            }
+          );
+        }
+
+        if (startButton) {
+          readyObserver.observe(
+            startButton,
+            {
+              attributes: true,
+              attributeFilter: [
+                "disabled"
+              ]
+            }
+          );
+        }
+      }
+
+
+      /*
+       * ------------------------------------------------------------
+       * SPLASH WATCHER
+       * ------------------------------------------------------------
+       */
+
+      function stopSplashObserver() {
+        if (splashObserver) {
+          splashObserver.disconnect();
+          splashObserver = null;
+        }
+      }
+
+
+      function removeLoader() {
+        if (!loader) {
+          return;
+        }
+
+        loader.classList.add("done");
+
+        const oldLoader = loader;
+
+        loader = null;
+        logText = null;
+
+        window.setTimeout(() => {
+          oldLoader.remove();
+        }, 350);
+      }
+
+
+      function checkSplash() {
+        if (destroyed) {
+          return;
+        }
+
+        if (!splashIsGone()) {
+          return;
+        }
+
+        stopSplashObserver();
+        stopReadyObservers();
+        stopLogMirroring();
+
+        removeLoader();
+
+        destroyed = true;
+      }
+
+
+      function watchSplash() {
+        cacheElements();
+
+        if (
+          !splash ||
+          splashObserver
+        ) {
+          return;
+        }
+
+        splashObserver =
+          new MutationObserver(checkSplash);
+
+        /*
+         * Watch only the splash itself.
+         */
+        splashObserver.observe(
+          splash,
+          {
+            attributes: true,
+            attributeFilter: [
+              "hidden",
+              "style",
+              "class"
+            ]
+          }
+        );
+      }
+
+
+      /*
+       * ------------------------------------------------------------
+       * GPU ACKNOWLEDGEMENT
+       * ------------------------------------------------------------
+       */
+
+      function acknowledgeGPU() {
+        cacheElements();
+
+        if (
+          !gpuAck ||
+          gpuAck.checked
+        ) {
+          return;
+        }
+
+        gpuAck.checked = true;
+
+        gpuAck.dispatchEvent(
+          new Event(
+            "change",
+            {
+              bubbles: true
+            }
+          )
+        );
+      }
+
+
+      /*
+       * ------------------------------------------------------------
+       * START BLENDER
+       * ------------------------------------------------------------
+       */
+
+      async function launchBlender() {
+        if (
+          launched ||
+          destroyed
+        ) {
+          return;
+        }
+
+        cacheElements();
+
+        if (
+          !isReady() ||
+          !startButton ||
+          startButton.disabled
+        ) {
+          return;
+        }
+
+        /*
+         * This MUST happen before any asynchronous wait so no second
+         * mutation can schedule another Blender launch.
+         */
+        launched = true;
+
+
+        /*
+         * Stop our startup observers BEFORE Blender begins allocating
+         * WASM/WebGPU memory.
+         */
+        stopReadyObservers();
+        stopLogMirroring();
+
+
+        /*
+         * Make sure the GPU acknowledgement is accepted.
+         */
+        acknowledgeGPU();
+
+
+        /*
+         * Give pending browser layout/mutation work two frames to
+         * complete.
+         */
+        await nextFrame();
+        await nextFrame();
+
+
+        /*
+         * Then give temporary download/decompression allocations a
+         * short opportunity to become collectible.
+         *
+         * JavaScript cannot explicitly force the browser to GC.
+         */
+        startTimeout = window.setTimeout(
+          () => {
+            startTimeout = 0;
+
+            cacheElements();
+
+            if (
+              destroyed ||
+              !startButton
+            ) {
+              return;
+            }
+
+            /*
+             * Don't click a disabled button.
+             *
+             * If the app unexpectedly changed state during the small
+             * delay, allow another ready check rather than forcing it.
+             */
+            if (startButton.disabled) {
+              launched = false;
+              watchReadyState();
+              maybeLaunch();
+              return;
+            }
+
+            startButton.click();
+
+            /*
+             * Keep only the splash watcher alive now.
+             * It removes our animation when the real Blender view
+             * replaces/hides the splash.
+             */
+            checkSplash();
+          },
+          START_DELAY_MS
+        );
+      }
+
+
+      function maybeLaunch() {
+        if (
+          launched ||
+          destroyed
+        ) {
+          return;
+        }
+
+        cacheElements();
+
+        /*
+         * Automatically accept the GPU warning as soon as it exists.
+         */
+        acknowledgeGPU();
+
+        if (
+          isReady() &&
+          startButton &&
+          !startButton.disabled
+        ) {
+          launchBlender();
+        }
+      }
+
+
+      /*
+       * ------------------------------------------------------------
+       * INITIALIZATION
+       * ------------------------------------------------------------
+       */
+
+      function initialize() {
+        cacheElements();
+
+        /*
+         * Start decorative log mirroring only if the original app's
+         * console already exists.
+         */
+        startLogMirroring();
+
+        watchReadyState();
+        watchSplash();
+
+        /*
+         * The bundle may already have reached ready before this script
+         * executes, so check immediately.
+         */
+        maybeLaunch();
+        checkSplash();
+      }
+
+
+      /*
+       * The module script may create/update some startup elements after
+       * parsing. Instead of permanently observing the entire page, use
+       * a temporary lightweight bootstrap observer.
+       */
+      let bootstrapObserver = null;
+
+      function bootstrap() {
+        cacheElements();
+
+        const haveStartupElements =
+          stageCard ||
+          splashShell ||
+          startButton;
+
+        if (haveStartupElements) {
+          if (bootstrapObserver) {
+            bootstrapObserver.disconnect();
+            bootstrapObserver = null;
+          }
+
+          initialize();
+          return true;
+        }
+
+        return false;
+      }
+
+
+      /*
+       * Try immediately.
+       */
+      if (!bootstrap()) {
+        bootstrapObserver =
+          new MutationObserver(() => {
+            if (bootstrap()) {
+              return;
+            }
+          });
+
+        /*
+         * This whole-document observer is TEMPORARY.
+         *
+         * It exists only until the Blender startup UI appears, then it
+         * disconnects immediately.
+         */
+        bootstrapObserver.observe(
+          document.body || document.documentElement,
+          {
+            childList: true,
+            subtree: true
+          }
+        );
+      }
+
+
+      /*
+       * One final load check in case the application initializes on the
+       * window load event.
+       */
+      window.addEventListener(
+        "load",
+        () => {
+          if (!destroyed) {
+            bootstrap();
+            maybeLaunch();
+          }
+        },
+        {
+          once: true
+        }
+      );
+
+
+      /*
+       * Clean up if the page is navigated away from.
+       */
+      window.addEventListener(
+        "pagehide",
+        () => {
+          destroyed = true;
+
+          if (bootstrapObserver) {
+            bootstrapObserver.disconnect();
+            bootstrapObserver = null;
+          }
+
+          stopReadyObservers();
+          stopSplashObserver();
+          stopLogMirroring();
+
+          if (startTimeout) {
+            clearTimeout(startTimeout);
+            startTimeout = 0;
+          }
+        },
+        {
+          once: true
+        }
+      );
+    })();
+  </script>
+
+  </body>
+</html>

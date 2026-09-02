@@ -1,0 +1,3479 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Unlim8ted OS</title>
+  <style>
+    :root {
+      --shelf-h: 56px;
+      --blue: #8ab4f8;
+      --blue2: #a8c7fa;
+      --ink: #e8eaed;
+      --muted: #9aa0a6;
+      --bg: #111315;
+      --surface: #202124;
+      --surface2: #292a2d;
+      --surface3: #303134;
+      --surface4: #3c4043;
+      --line: #3c4043;
+      --hover: #ffffff12;
+      --pressed: #ffffff1e;
+      --shadow: 0 16px 48px #0008;
+      color-scheme: dark;
+      font-family: Roboto, "Noto Sans", Arial, sans-serif;
+    }
+
+    :root[data-theme="light"] {
+      --ink: #202124;
+      --muted: #5f6368;
+      --bg: #f8f9fa;
+      --surface: #fff;
+      --surface2: #f1f3f4;
+      --surface3: #e8eaed;
+      --surface4: #dadce0;
+      --line: #dadce0;
+      --hover: #0000000a;
+      --pressed: #00000014;
+      --shadow: 0 16px 48px #0003;
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111315;
+      color: var(--ink);
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button,
+    input {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      border: 0;
+      background: none;
+      padding: 0;
+    }
+
+    .desktop {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      user-select: none;
+      background: #101215;
+    }
+
+    .wallpaper {
+      position: absolute;
+      inset: 0 0 var(--shelf-h);
+      background: radial-gradient(58% 70% at 75% 42%, #2554b9 0 24%, transparent 25%),
+        radial-gradient(54% 68% at 72% 40%, #172968 0 35%, transparent 36%),
+        radial-gradient(45% 66% at 41% 36%, #663448 0 28%, transparent 29%),
+        radial-gradient(60% 80% at 48% 65%, #151b37 0 54%, #0f1117 76%);
+      background-color: #101217;
+      transition:
+        0.2s filter,
+        0.2s background;
+    }
+
+    :root[data-theme="light"] .wallpaper {
+      filter: brightness(1.55) saturate(0.9);
+    }
+
+    .wallpaper::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, #0001, #0000 45%, #0004);
+    }
+
+    /* ChromeOS shelf */
+    .shelfbar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--shelf-h);
+      z-index: 950;
+      background: color-mix(in srgb, var(--surface) 72%, transparent);
+      backdrop-filter: blur(22px) saturate(135%);
+      -webkit-backdrop-filter: blur(22px) saturate(135%);
+      border-top: 1px solid #ffffff0b;
+      display: grid;
+      grid-template-columns: 180px 1fr 270px;
+      align-items: center;
+      padding: 0 8px;
+    }
+
+    .shelf-left {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .launcher-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .launcher-btn:hover {
+      background: var(--hover);
+    }
+
+    .launcher-mark {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #f1f3f4;
+      box-shadow: inset 0 0 0 6px #c6c9ce;
+    }
+
+    .shelf-center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .shelf-app {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition:
+        0.12s background,
+        0.12s transform;
+    }
+
+    .shelf-app:hover {
+      background: var(--hover);
+    }
+
+    .shelf-app:active {
+      transform: scale(0.94);
+    }
+
+    .shelf-app.running::after {
+      content: "";
+      position: absolute;
+      bottom: 1px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--blue2);
+    }
+
+    .shelf-app.active {
+      background: #ffffff1a;
+    }
+
+    .shelf-app.dragging {
+      opacity: .45;
+      transform: scale(.9);
+    }
+
+    .shelf-app.drag-over {
+      background: var(--hover);
+    }
+
+    .shelf-app[data-pinned="0"]::before {
+      content: "";
+      position: absolute;
+      bottom: 1px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--blue2);
+      opacity: .9;
+    }
+
+    .shelf-app[data-pinned="0"].running::after {
+      display: none;
+    }
+
+    #shelfAppMenu {
+      z-index: 20000;
+    }
+
+    .shelf-tray {
+      justify-self: end;
+      height: 40px;
+      min-width: 210px;
+      border-radius: 20px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 9px;
+      cursor: pointer;
+    }
+
+    .shelf-tray:hover,
+    .shelf-tray.open {
+      background: var(--hover);
+    }
+
+    .tray-date {
+      font-size: 12px;
+      line-height: 15px;
+      text-align: right;
+      font-weight: 500;
+      min-width: 70px;
+    }
+
+    .tray-icon {
+      width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      color: var(--ink);
+      opacity: 0.95;
+    }
+
+    .battery {
+      font-size: 12px;
+      font-weight: 500;
+      min-width: 28px;
+    }
+
+    /* reusable icons */
+    .app-icon {
+      width: 34px;
+      height: 34px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+
+    .app-icon svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .app-icon::before,
+    .app-icon::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    /* launcher */
+    .launcher {
+      position: absolute;
+      z-index: 940;
+      left: 12px;
+      bottom: 68px;
+      width: min(610px, calc(100vw - 24px));
+      height: min(610px, calc(100vh - 90px));
+      border-radius: 26px;
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      box-shadow: var(--shadow);
+      border: 1px solid #ffffff10;
+      backdrop-filter: blur(28px);
+      padding: 22px 24px;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .launcher.open {
+      display: flex;
+    }
+
+    .launch-search-wrap {
+      height: 48px;
+      border-radius: 24px;
+      background: var(--surface3);
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      gap: 12px;
+      flex: 0 0 auto;
+    }
+
+    .launch-search-wrap svg {
+      width: 20px;
+      height: 20px;
+      color: var(--muted);
+    }
+
+    .launchsearch {
+      border: 0;
+      outline: 0;
+      background: transparent;
+      flex: 1;
+      font-size: 15px;
+    }
+
+    .launchsearch::placeholder {
+      color: var(--muted);
+    }
+
+    .launcher-kicker {
+      margin: 22px 4px 11px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    .continue-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .continue-card {
+      flex: 1;
+      min-width: 0;
+      height: 70px;
+      border-radius: 14px;
+      background: var(--surface3);
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 10px 13px;
+      cursor: pointer;
+    }
+
+    .continue-card:hover {
+      background: var(--surface4);
+    }
+
+    .continue-card b,
+    .continue-card span {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .continue-card span {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .appgrid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px 6px;
+      overflow: auto;
+      padding: 4px 2px 14px;
+    }
+
+    .appbtn {
+      height: 88px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .appbtn:hover {
+      background: var(--hover);
+    }
+
+    .appbtn .app-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    /* Quick Settings */
+    .quick-panel {
+      position: absolute;
+      z-index: 945;
+      right: 12px;
+      bottom: 68px;
+      width: 390px;
+      max-height: calc(100vh - 84px);
+      border-radius: 26px;
+      background: color-mix(in srgb, var(--surface) 96%, transparent);
+      box-shadow: var(--shadow);
+      border: 1px solid #ffffff10;
+      backdrop-filter: blur(28px);
+      padding: 14px;
+      display: none;
+      overflow: auto;
+    }
+
+    .quick-panel.open {
+      display: block;
+    }
+
+    .q-head {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 4px 8px;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #8ab4f8, #c58af9);
+      display: grid;
+      place-items: center;
+      color: #202124;
+      font-weight: 700;
+    }
+
+    .signout {
+      height: 34px;
+      padding: 0 15px;
+      border-radius: 17px;
+      background: var(--surface3);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .q-round {
+      margin-left: auto;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--surface3);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      font-size: 17px;
+    }
+
+    .q-round+.q-round {
+      margin-left: 0;
+    }
+
+    .q-round:hover {
+      background: var(--surface4);
+    }
+
+    .q-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .q-tile {
+      height: 76px;
+      border-radius: 16px;
+      background: var(--surface3);
+      padding: 12px;
+      display: flex;
+      gap: 11px;
+      align-items: center;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .q-tile.on {
+      background: #8ab4f8;
+      color: #10284f;
+    }
+
+    .q-tile:hover {
+      filter: brightness(1.06);
+    }
+
+    .q-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #ffffff18;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+    }
+
+    .q-tile.on .q-circle {
+      background: #0b57d022;
+    }
+
+    .q-copy b,
+    .q-copy span {
+      display: block;
+    }
+
+    .q-copy b {
+      font-size: 13px;
+    }
+
+    .q-copy span {
+      font-size: 11px;
+      opacity: 0.75;
+      margin-top: 3px;
+    }
+
+    .slider-row {
+      height: 50px;
+      display: grid;
+      grid-template-columns: 36px 1fr 28px;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .slider-row input {
+      accent-color: #8ab4f8;
+      width: 100%;
+    }
+
+    .q-footer {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--line);
+      padding: 12px 5px 2px;
+      margin-top: 7px;
+    }
+
+    /* windows */
+    .win {
+      position: absolute;
+      display: none;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: 0 18px 70px #000b;
+      overflow: hidden;
+      resize: both;
+      border: 1px solid #ffffff0b;
+      z-index: 20;
+    }
+
+
+    /* Window interaction fixes */
+    .win:not([data-max="1"]) {
+      resize: both;
+    }
+
+    .win .app-body {
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .win.open {
+      display: flex;
+    }
+
+    .win.focused {
+      box-shadow: 0 20px 80px #000d;
+    }
+
+    .app-titlebar {
+      height: 42px;
+      flex: 0 0 auto;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      padding-left: 14px;
+      border-bottom: 1px solid var(--line);
+      user-select: none;
+    }
+
+    .app-title {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .window-controls {
+      display: flex;
+      height: 100%;
+      margin-left: auto;
+    }
+
+    .window-controls button {
+      width: 46px;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .window-controls button:hover {
+      background: var(--hover);
+    }
+
+    .window-controls .close:hover {
+      background: #c42b1c;
+      color: #fff;
+    }
+
+    .window-controls .min::before {
+      content: "";
+      width: 10px;
+      border-top: 1px solid currentColor;
+    }
+
+    .window-controls .max::before {
+      content: "";
+      width: 10px;
+      height: 8px;
+      border: 1px solid currentColor;
+    }
+
+    .app-body {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      background: var(--surface);
+    }
+
+    /* Chrome browser */
+    #browserWin {
+      left: 7%;
+      top: 5%;
+      width: 86%;
+      height: 80%;
+      min-width: 720px;
+    }
+
+    .chrome-frame {
+      background: #202124;
+    }
+
+    .chrome-tabs {
+      height: 44px;
+      background: #202124;
+      display: flex;
+      align-items: flex-end;
+      padding: 0 0 0 8px;
+      user-select: none;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: flex-end;
+      min-width: 0;
+      flex: 1;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .tab {
+      position: relative;
+      height: 36px;
+      min-width: 95px;
+      max-width: 240px;
+      flex: 1;
+      border-radius: 10px 10px 0 0;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #bdc1c6;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .tab:hover {
+      background: #303134;
+    }
+
+    .tab.active {
+      background: #35363a;
+      color: #e8eaed;
+    }
+
+    .tab.active::before,
+    .tab.active::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      width: 10px;
+      height: 10px;
+      background: #202124;
+    }
+
+    .tab.active::before {
+      left: -10px;
+      border-bottom-right-radius: 10px;
+    }
+
+    .tab.active::after {
+      right: -10px;
+      border-bottom-left-radius: 10px;
+    }
+
+    .tab-favicon {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: conic-gradient(#ea4335 0 33%, #fbbc04 0 66%, #34a853 0);
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .tab-favicon::after {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      background: #4285f4;
+    }
+
+    .tab .txt {
+      min-width: 0;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tab-x {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 15px;
+    }
+
+    .tab-x:hover {
+      background: #ffffff20;
+    }
+
+    .newtabbtn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      margin: 0 4px 3px 5px;
+      color: #bdc1c6;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .newtabbtn:hover {
+      background: #ffffff16;
+    }
+
+    .chrome-window-controls {
+      height: 44px;
+      display: flex;
+      align-self: flex-start;
+    }
+
+    .chrome-window-controls button {
+      width: 46px;
+      height: 44px;
+      color: #e8eaed;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .chrome-window-controls button:hover {
+      background: #ffffff16;
+    }
+
+    .chrome-window-controls .close:hover {
+      background: #c42b1c;
+    }
+
+    .chrome-window-controls .min::before {
+      content: "";
+      width: 10px;
+      border-top: 1px solid currentColor;
+    }
+
+    .chrome-window-controls .max::before {
+      content: "";
+      width: 10px;
+      height: 8px;
+      border: 1px solid currentColor;
+    }
+
+    .chrome-toolbar {
+      height: 48px;
+      background: #35363a;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 8px;
+      border-bottom: 1px solid #2b2c2e;
+    }
+
+    .navbtn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #bdc1c6;
+      cursor: pointer;
+      font-size: 20px;
+    }
+
+    .navbtn:hover {
+      background: #ffffff14;
+    }
+
+    .navbtn:disabled {
+      opacity: 0.35;
+    }
+
+    .omnibox-wrap {
+      height: 36px;
+      border-radius: 18px;
+      background: #202124;
+      display: flex;
+      align-items: center;
+      flex: 1;
+      min-width: 120px;
+      border: 1px solid transparent;
+    }
+
+    .omnibox-wrap:focus-within {
+      background: #202124;
+      border-color: #8ab4f8;
+    }
+
+    .site-chip {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      color: #9aa0a6;
+    }
+
+    .omnibox {
+      min-width: 0;
+      flex: 1;
+      height: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: #e8eaed;
+      font-size: 14px;
+    }
+
+    .toolbar-action {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #bdc1c6;
+      cursor: pointer;
+    }
+
+    .toolbar-action:hover {
+      background: #ffffff12;
+    }
+
+    .browser-content {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      background: #202124;
+      overflow: hidden;
+      contain: strict;
+    }
+
+    .gecko-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      background: #fff;
+      outline: 0;
+      touch-action: none;
+      overscroll-behavior: none;
+    }
+
+    .newtab {
+      position: absolute;
+      inset: 0;
+      background: #202124;
+      color: #e8eaed;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      flex-direction: column;
+      padding-top: min(15vh, 120px);
+    }
+
+    .newtab-logo {
+      font-size: 54px;
+      letter-spacing: -2px;
+      font-weight: 500;
+      margin-bottom: 34px;
+    }
+
+    .newtab-logo .u8 {
+      color: #8ab4f8;
+    }
+
+    .searchbox {
+      width: min(580px, 72%);
+      height: 46px;
+      border-radius: 23px;
+      background: #303134;
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      gap: 13px;
+      box-shadow: 0 1px 6px #0007;
+    }
+
+    .searchbox:hover {
+      background: #3c4043;
+    }
+
+    .searchbox input {
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: #e8eaed;
+      flex: 1;
+      font-size: 15px;
+    }
+
+    .shortcuts {
+      display: flex;
+      gap: 16px;
+      margin-top: 28px;
+    }
+
+    .shortcut {
+      width: 96px;
+      height: 96px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 9px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .shortcut:hover {
+      background: #ffffff0b;
+    }
+
+    .shortcut i {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #303134;
+      display: grid;
+      place-items: center;
+      font-style: normal;
+      font-size: 17px;
+    }
+
+    .bootstate {
+      position: absolute;
+      inset: 0;
+      background: #202124;
+      display: none;
+      place-items: center;
+      z-index: 5;
+    }
+
+    .bootcard {
+      width: min(430px, 75%);
+      text-align: center;
+    }
+
+    .bootcard h2 {
+      font-size: 20px;
+      font-weight: 500;
+      margin: 0 0 18px;
+    }
+
+    .progress {
+      height: 4px;
+      background: #3c4043;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 5%;
+      background: #8ab4f8;
+      transition: 0.25s;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .bootmsg {
+      margin-top: 12px;
+    }
+
+    .error {
+      margin-top: 11px;
+      color: #f28b82;
+      white-space: pre-wrap;
+      font:
+        12px/1.5 ui-monospace,
+        monospace;
+    }
+
+    .page-load {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      z-index: 7;
+      pointer-events: none;
+      overflow: hidden;
+      display: none;
+    }
+
+    .page-load::before {
+      content: "";
+      display: block;
+      width: 40%;
+      height: 100%;
+      background: #8ab4f8;
+      animation: pageload 1s infinite ease-in-out;
+    }
+
+    @keyframes pageload {
+      from {
+        transform: translateX(-110%);
+      }
+
+      to {
+        transform: translateX(350%);
+      }
+    }
+
+    /* Files */
+    #filesWin {
+      left: 10%;
+      top: 7%;
+      width: 80%;
+      height: 78%;
+    }
+
+    .files-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      height: 100%;
+      background: var(--surface);
+    }
+
+    .files-sidebar {
+      padding: 12px 8px;
+      background: var(--surface2);
+      border-right: 1px solid var(--line);
+    }
+
+    .files-side-title {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 8px 15px;
+    }
+
+    .sideitem {
+      height: 40px;
+      border-radius: 20px;
+      padding: 0 15px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .sideitem:hover {
+      background: var(--hover);
+    }
+
+    .sideitem.sel {
+      background: #8ab4f820;
+      color: #aecbfa;
+    }
+
+    .filesmain {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .filetop {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      gap: 8px;
+    }
+
+    .filetop .path {
+      flex: 1;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pill {
+      height: 34px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      cursor: pointer;
+      background: var(--surface2);
+    }
+
+    .pill:hover {
+      background: var(--surface3);
+    }
+
+    .fileheader,
+    .frow {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) 120px 180px;
+      align-items: center;
+      padding: 0 16px;
+    }
+
+    .fileheader {
+      height: 38px;
+      color: var(--muted);
+      font-size: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .filelist {
+      overflow: auto;
+      flex: 1;
+    }
+
+    .frow {
+      height: 44px;
+      border-bottom: 1px solid #ffffff08;
+      cursor: default;
+    }
+
+    .frow:hover {
+      background: var(--hover);
+    }
+
+    .fname {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+    }
+
+    .file-glyph {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+    }
+
+    .filename {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* terminal */
+    #terminalWin {
+      left: 15%;
+      top: 10%;
+      width: 70%;
+      height: 70%;
+    }
+
+    .terminal {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      background: #17181a;
+      color: #e8eaed;
+      display: flex;
+      flex-direction: column;
+      font:
+        13px/1.45 ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Consolas,
+        monospace;
+    }
+
+    .termout {
+      white-space: pre-wrap;
+      overflow: auto;
+      flex: 1;
+      user-select: text;
+    }
+
+    .termin {
+      border: 0;
+      border-top: 1px solid #2c2d30;
+      outline: 0;
+      background: #17181a;
+      color: #e8eaed;
+      height: 34px;
+      font: inherit;
+    }
+
+    .term-badge {
+      font-size: 11px;
+      color: #81c995;
+      margin-right: 10px;
+    }
+
+
+
+    /* Settings starts larger; its UI lives in apps/settings/index.html. */
+    #settingsWin {
+      left: 5%;
+      top: 4%;
+      width: 90%;
+      height: 88%;
+    }
+
+    /* App Store */
+    #storeWin {
+      left: 5%;
+      top: 4%;
+      width: 90%;
+      height: 86%;
+      min-width: 720px;
+      min-height: 520px;
+    }
+
+
+    /* context + overview */
+    .contextmenu {
+      position: absolute;
+      z-index: 980;
+      min-width: 220px;
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      padding: 6px;
+      display: none;
+      border: 1px solid var(--line);
+    }
+
+    .contextmenu.open {
+      display: block;
+    }
+
+    .contextitem {
+      height: 36px;
+      border-radius: 8px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .contextitem:hover {
+      background: var(--hover);
+    }
+
+    @media (max-width: 800px) {
+      .shelfbar {
+        grid-template-columns: 70px 1fr 190px;
+      }
+
+      .shelf-left .label {
+        display: none;
+      }
+
+      .launcher {
+        width: calc(100vw - 24px);
+      }
+
+      .quick-panel {
+        width: min(390px, calc(100vw - 24px));
+      }
+
+      .appgrid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .files-layout {
+        grid-template-columns: 185px 1fr;
+      }
+
+      .win {
+        min-width: 360px;
+      }
+    }
+
+    /* ===== V23 ChromeOS precision/refinement overrides ===== */
+    :root {
+      --shelf-h: 56px;
+    }
+
+    .shelfbar {
+      display: block;
+      padding: 0 8px;
+      height: var(--shelf-h);
+    }
+
+    .shelf-left {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .shelf-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .shelf-tray {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 40px;
+      min-width: 0;
+      width: auto;
+      padding: 0 13px;
+    }
+
+    .shelf-app {
+      width: 44px;
+      height: 44px;
+      border-radius: 13px;
+    }
+
+    .shelf-app .app-icon {
+      width: 32px;
+      height: 32px;
+    }
+
+    /* Chrome tab strip: plus button stays directly after the final tab, not at the far edge. */
+    .chrome-tabs {
+      height: 42px;
+      align-items: flex-end;
+      padding-left: 7px;
+    }
+
+    .tabs {
+      flex: 0 1 auto;
+      width: auto;
+      max-width: calc(100% - 190px);
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .tab {
+      flex: 0 1 236px;
+      width: 236px;
+      min-width: 82px;
+      max-width: 236px;
+      height: 35px;
+      padding: 0 9px 0 11px;
+      gap: 7px;
+      border-radius: 9px 9px 0 0;
+    }
+
+    .newtabbtn {
+      flex: 0 0 32px;
+      width: 32px;
+      height: 32px;
+      margin: 0 4px 2px 4px;
+      display: grid;
+      place-items: center;
+      font-size: 0;
+    }
+
+    .newtabbtn svg {
+      width: 17px;
+      height: 17px;
+      pointer-events: none;
+    }
+
+    .chrome-window-controls {
+      margin-left: auto;
+      height: 42px;
+    }
+
+    .chrome-window-controls button {
+      height: 42px;
+    }
+
+    .chrome-toolbar {
+      height: 46px;
+      padding: 5px 8px 6px;
+      gap: 2px;
+    }
+
+    .navbtn {
+      width: 34px;
+      height: 34px;
+      font-size: 0;
+    }
+
+    .navbtn svg {
+      width: 19px;
+      height: 19px;
+      pointer-events: none;
+    }
+
+    .toolbar-action {
+      font-size: 0;
+    }
+
+    .toolbar-action svg {
+      width: 18px;
+      height: 18px;
+      pointer-events: none;
+    }
+
+    .site-chip {
+      font-size: 0;
+    }
+
+    .site-chip svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .omnibox-wrap {
+      height: 34px;
+      border-radius: 17px;
+    }
+
+    .omnibox {
+      font-size: 13px;
+    }
+
+    .chrome-frame {
+      border-radius: 10px;
+    }
+
+    /* Fix the enormous new-tab magnifier caused by intrinsic SVG sizing. */
+    .searchbox svg {
+      width: 20px !important;
+      height: 20px !important;
+      min-width: 20px;
+      max-width: 20px;
+      flex: 0 0 20px;
+      display: block;
+    }
+
+    .searchbox {
+      height: 46px;
+      gap: 12px;
+    }
+
+    .searchbox input {
+      min-width: 0;
+    }
+
+    .launch-search-wrap svg {
+      width: 19px !important;
+      height: 19px !important;
+      min-width: 19px;
+      max-width: 19px;
+    }
+
+    .newtab {
+      padding-top: min(14vh, 112px);
+    }
+
+    .newtab-logo {
+      font-size: 50px;
+      margin-bottom: 30px;
+    }
+
+    /* Keep every movable window entirely inside the usable ChromeOS desktop. */
+    .win {
+      max-width: 100vw;
+      max-height: calc(100vh - var(--shelf-h));
+      overflow: hidden;
+    }
+
+    .win:not([data-max="1"]) {
+      min-width: min(440px, 100vw);
+      min-height: min(300px, calc(100vh - var(--shelf-h)));
+    }
+
+    /* OS mouse capture for the hosted browser. The synthetic cursor avoids the real browser edge UI. */
+    .capture-cursor {
+      position: fixed;
+      z-index: 20000;
+      width: 17px;
+      height: 23px;
+      display: none;
+      pointer-events: none;
+      transform: translate(-1px, -1px);
+      filter: drop-shadow(0 1px 1px #0008);
+    }
+
+    .capture-cursor::before {
+      content: "";
+      display: block;
+      width: 17px;
+      height: 23px;
+      background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 23'%3E%3Cpath d='M1 1v17l4.5-4 3.2 7 3-1.4-3.2-6.7H15z' fill='white' stroke='%23202124' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+
+    .capture-hint {
+      position: absolute;
+      right: 12px;
+      top: 10px;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      gap: 7px;
+      height: 28px;
+      padding: 0 11px;
+      border-radius: 14px;
+      background: #202124e8;
+      color: #e8eaed;
+      font-size: 11px;
+      box-shadow: 0 2px 10px #0007;
+      pointer-events: none;
+    }
+
+    .capture-hint.show {
+      display: flex;
+    }
+
+    body.os-captured,
+    body.os-captured * {
+      cursor: none !important;
+    }
+
+    body.os-captured .capture-cursor {
+      display: block;
+    }
+
+    /* More ChromeOS-like dynamic app windows and editor apps. */
+    .dynamic-app iframe {
+      min-height: 0;
+    }
+
+    .browser-content {
+      position: relative;
+      flex: 1 1 0;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      contain: none;
+    }
+
+    .gecko-canvas {
+      position: absolute;
+      inset: 0;
+
+      width: 100%;
+      height: 100%;
+
+      min-width: 0;
+      min-height: 0;
+      max-width: none;
+      max-height: none;
+
+      display: block;
+      margin: 0;
+      padding: 0;
+      border: 0;
+
+      background: #fff;
+      outline: none;
+
+      /* Normal browser mouse behavior */
+      touch-action: auto;
+      overscroll-behavior: auto;
+      cursor: default;
+    }
+
+    /* Kill the synthetic/captured cursor */
+    .capture-cursor,
+    .capture-hint {
+      display: none !important;
+    }
+
+    .app-titlebar {
+      height: 40px;
+    }
+
+    .window-controls button {
+      width: 44px;
+    }
+
+
+    /* Accessibility settings actually affect the shell. */
+    :root.large-cursor * {
+      cursor: default !important;
+    }
+
+    :root.large-cursor button,
+    :root.large-cursor a,
+    :root.large-cursor [onclick] {
+      cursor: pointer !important;
+    }
+
+    :root.reduce-motion * {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    @media (max-width: 760px) {
+      .shelf-center {
+        gap: 0;
+      }
+
+      .shelf-app {
+        width: 40px;
+      }
+
+      .shelf-tray .battery {
+        display: none;
+      }
+
+      .tray-date {
+        min-width: 58px;
+      }
+
+      .launcher {
+        left: 8px;
+        width: calc(100vw - 16px);
+      }
+
+      .quick-panel {
+        right: 8px;
+        width: min(390px, calc(100vw - 16px));
+      }
+
+      .files-layout {
+        grid-template-columns: 185px 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="desktop" id="desktop">
+    <div class="wallpaper" id="wallpaper"></div>
+    <div id="launcher" class="launcher">
+      <div class="launch-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4 4" />
+        </svg><input id="launchSearch" class="launchsearch" placeholder="Search your device, apps, settings, and web"
+          autocomplete="off" />
+      </div>
+      <div class="launcher-kicker">Continue where you left off</div>
+      <div class="continue-row">
+        <div class="continue-card" onclick="openApp('browser');closePanels()">
+          <span class="app-icon" data-catalog-icon="browser"></span>
+          <div><b>Chrome</b><span>New tab</span></div>
+        </div>
+        <div class="continue-card" onclick="openApp('files');closePanels()">
+          <span class="app-icon" data-catalog-icon="files"></span>
+          <div><b>Files</b><span>Downloads</span></div>
+        </div>
+      </div>
+      <div class="launcher-kicker">Apps</div>
+      <div id="appgrid" class="appgrid"></div>
+    </div>
+    <div id="quick" class="quick-panel">
+      <div class="q-head">
+        <div class="avatar">U</div>
+        <button class="signout">Sign out</button><button class="q-round" title="Power">⏻</button><button class="q-round"
+          title="Settings" onclick="openApp('settings');closePanels()">
+          <span class="app-icon" data-catalog-icon="settings"></span>
+        </button>
+      </div>
+      <div class="q-grid">
+        <button class="q-tile on" id="wifiTile">
+          <span class="q-circle">⌁</span><span class="q-copy"><b>Wi‑Fi</b><span
+              id="wifiState">Connected</span></span></button><button class="q-tile on" id="btTile">
+          <span class="q-circle">ᛒ</span><span class="q-copy"><b>Bluetooth</b><span>On</span></span></button><button
+          class="q-tile" id="dndTile">
+          <span class="q-circle">−</span><span class="q-copy"><b>Do Not
+              Disturb</b><span>Off</span></span></button><button class="q-tile on" id="darkTile"
+          onclick="toggleDarkQuick()">
+          <span class="q-circle">◐</span><span class="q-copy"><b>Dark theme</b><span id="darkState">On</span></span>
+        </button>
+      </div>
+      <div class="slider-row">
+        <span>🔊</span><input type="range" min="0" max="100" value="68" /><span>⌄</span>
+      </div>
+      <div class="slider-row">
+        <span>☀</span><input id="brightRange" type="range" min="55" max="120" value="100" /><span>⌄</span>
+      </div>
+      <div class="q-footer"><span id="qdate"></span><span id="qbattery">Battery</span></div>
+    </div>
+    <div class="shelfbar">
+      <div class="shelf-left">
+        <button class="launcher-btn" id="launcherButton" onclick="toggleLauncher()">
+          <span class="launcher-mark"></span>
+        </button>
+      </div>
+      <div class="shelf-center" id="shelfCenter"></div>
+      <button class="shelf-tray" id="tray" onclick="toggleQuick()">
+        <span class="tray-icon"><svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 18.5 15.4 15a4.8 4.8 0 0 0-6.8 0L12 18.5Zm-5.7-5.8 1.8 1.8a5.5 5.5 0 0 1 7.8 0l1.8-1.8a8 8 0 0 0-11.4 0ZM3 9.4l1.8 1.8a10.2 10.2 0 0 1 14.4 0L21 9.4a12.8 12.8 0 0 0-18 0Z" />
+          </svg></span><span class="tray-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="1.7">
+            <rect x="4" y="7" width="14" height="10" rx="2" />
+            <path d="M20 10v4" />
+            <path d="M7 10h7v4H7z" fill="currentColor" stroke="none" />
+          </svg></span><span class="battery" id="batteryPct"></span><span class="tray-date" id="clock"></span>
+      </button>
+    </div>
+
+    <div id="browserWin" data-app-id="browser" data-running="0" class="win chrome-frame">
+      <div class="app-body" id="browserHost" style="inset:0;position:absolute">
+        <iframe id="browserFrame" src="./apps/browser/index.html"
+          allow="fullscreen; clipboard-read; clipboard-write; gamepad"
+          style="position:absolute;inset:0;width:100%;height:100%;border:0;background:#202124"></iframe>
+      </div>
+    </div>
+
+    <div id="filesWin" data-app-id="files" data-running="0" class="win">
+      <div class="app-titlebar dragbar">
+        <div class="app-title">Files</div>
+        <div class="window-controls">
+          <button class="min" onclick="minWin('filesWin')"></button><button class="max"
+            onclick="maxWin('filesWin')"></button><button class="close" onclick="closeWin('filesWin')">×</button>
+        </div>
+      </div>
+      <div class="app-body"><iframe id="filesFrame" src="./apps/files/index.html"
+          allow="clipboard-read; clipboard-write"
+          style="position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--surface)"></iframe></div>
+    </div>
+
+    <div id="terminalWin" data-app-id="terminal" data-running="0" class="win">
+      <div class="app-titlebar dragbar">
+        <div class="app-title">Terminal</div>
+        <div class="window-controls">
+          <button class="min" onclick="minWin('terminalWin')"></button><button class="max"
+            onclick="maxWin('terminalWin')"></button><button class="close" onclick="closeWin('terminalWin')">×</button>
+        </div>
+      </div>
+      <div class="app-body"><iframe id="terminalFrame" src="./apps/terminal/index.html"
+          allow="clipboard-read; clipboard-write"
+          style="position:absolute;inset:0;width:100%;height:100%;border:0;background:#17181a"></iframe></div>
+    </div>
+
+    <div id="storeWin" data-app-id="store" data-running="0" class="win">
+      <div class="app-titlebar dragbar">
+        <div class="app-title">App Store</div>
+        <div class="window-controls">
+          <button class="min" onclick="minWin('storeWin')"></button><button class="max"
+            onclick="maxWin('storeWin')"></button><button class="close" onclick="closeWin('storeWin')">×</button>
+        </div>
+      </div>
+      <div class="app-body">
+        <iframe id="storeFrame" src="./apps/store/index.html" allow="clipboard-read; clipboard-write"
+          style="position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--surface)"></iframe>
+      </div>
+    </div>
+
+    <div id="settingsWin" data-app-id="settings" data-running="0" class="win">
+      <div class="app-titlebar dragbar">
+        <div class="app-title">Settings</div>
+        <div class="window-controls">
+          <button class="min" onclick="minWin('settingsWin')"></button><button class="max"
+            onclick="maxWin('settingsWin')"></button><button class="close" onclick="closeWin('settingsWin')">×</button>
+        </div>
+      </div>
+      <div class="app-body">
+        <iframe id="settingsFrame" src="./apps/settings/index.html" allow="clipboard-read; clipboard-write"
+          style="position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--surface)"></iframe>
+      </div>
+    </div>
+    <div id="contextmenu" class="contextmenu">
+      <div class="contextitem" onclick="openApp('settings');closeContext()">
+        Set wallpaper &amp; style
+      </div>
+      <div class="contextitem" onclick="openApp('settings');closeContext()">
+        Display settings
+      </div>
+      <div class="contextitem" onclick="toggleShelfAutohide();closeContext()">Autohide shelf</div>
+    </div>
+    <div id="shelfAppMenu" class="contextmenu">
+      <div class="contextitem" id="shelfMenuOpen">Open</div>
+      <div class="contextitem" id="shelfMenuPin">Unpin from shelf</div>
+    </div>
+  </div>
+  <script src="catalog-data.js"></script>
+  <script>
+    const RESOURCE_URLS = {
+      geckoJs: "./apps/browser/gecko.js",
+      geckoWasm: "./apps/browser/gecko.wasm",
+      v86Js: "./linux/v86.js",
+      v86Wasm: "./linux/v86.wasm",
+      kernel: "./linux/kernel.bzimage",
+      bios: "./linux/bios.bin",
+      vgabios: "./linux/vgabios.bin",
+    };
+    const loadedScripts = {};
+    function loadScript(src) {
+      if (loadedScripts[src]) return loadedScripts[src];
+      loadedScripts[src] = new Promise((res, rej) => {
+        let s = document.createElement("script");
+        s.src = src;
+        s.onload = res;
+        s.onerror = () => rej(Error(`Could not load ${src}`));
+        document.head.append(s);
+      });
+      return loadedScripts[src];
+    }
+    const DB = {
+      db: null,
+      cache: new Map(),
+      async init() {
+        this.db = await new Promise((res, rej) => {
+          let r = indexedDB.open("unlim8ted-os", 1);
+          r.onupgradeneeded = () => r.result.createObjectStore("fs", { keyPath: "path" });
+          r.onsuccess = () => res(r.result);
+          r.onerror = () => rej(r.error);
+        });
+        for (const p of [
+          "/home/user/Documents/.keep",
+          "/home/user/Downloads/.keep",
+          "/home/user/Pictures/.keep",
+          "/home/user/Music/.keep",
+        ])
+          if (!(await this.get(p))) await this.put(p, new Uint8Array(), Date.now());
+        await seedApps();
+        this.cache.clear();
+        for (const f of await this.all())
+          this.cache.set(f.path, { path:f.path, data:new Uint8Array(f.data || []), mtime:f.mtime || 0 });
+      },
+      tx(m = "readonly") {
+        return this.db.transaction("fs", m).objectStore("fs");
+      },
+      get(path) {
+        return new Promise((r) => {
+          let q = this.tx().get(path);
+          q.onsuccess = () => r(q.result || null);
+          q.onerror = () => r(null);
+        });
+      },
+      put(path, data, mtime = Date.now()) {
+        const bytes = data instanceof Uint8Array ? data : new Uint8Array(data || []);
+        this.cache.set(path, { path, data: bytes, mtime });
+        return new Promise((r, j) => {
+          let q = this.tx("readwrite").put({ path, data: Array.from(bytes), mtime });
+          q.onsuccess = () => r();
+          q.onerror = () => j(q.error);
+        });
+      },
+      del(path) {
+        this.cache.delete(path);
+        return new Promise((r) => {
+          let q = this.tx("readwrite").delete(path);
+          q.onsuccess = () => r();
+        });
+      },
+      async delPrefix(prefix) {
+        const base = String(prefix || "").replace(/\/+$/, "");
+        if (!base) return;
+        for (const f of await this.all()) {
+          if (f.path === base || f.path.startsWith(base + "/")) await this.del(f.path);
+        }
+      },
+      all() {
+        return new Promise((r) => {
+          let q = this.tx().getAll();
+          q.onsuccess = () => r(q.result || []);
+          q.onerror = () => r([]);
+        });
+      },
+    };
+    // Shelf state: initial defaults are used once, then the user's order/pins persist.
+    const INITIAL_PINNED_APPS = ["browser", "files", "store", "terminal", "settings"];
+    const SHELF_PINS_KEY = "u8-shelf-pins-v1";
+    const catalogApp = (id) => catalog.find((app) => app.id === id);
+    const isSystemApp = (id) => !!winForApp(id);
+
+    function loadPinnedApps() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SHELF_PINS_KEY));
+        if (Array.isArray(saved)) return saved.filter((id, i, a) => catalogApp(id) && a.indexOf(id) === i);
+      } catch { }
+      return [...INITIAL_PINNED_APPS];
+    }
+    let pinnedApps = loadPinnedApps();
+
+    function savePinnedApps() {
+      localStorage.setItem(SHELF_PINS_KEY, JSON.stringify(pinnedApps));
+    }
+    function isPinned(id) {
+      return pinnedApps.includes(id);
+    }
+    function pinApp(id, at = pinnedApps.length) {
+      if (!catalogApp(id) || isPinned(id)) return;
+      pinnedApps.splice(Math.max(0, Math.min(at, pinnedApps.length)), 0, id);
+      savePinnedApps();
+      updateShelf();
+    }
+    function unpinApp(id) {
+      pinnedApps = pinnedApps.filter((x) => x !== id);
+      savePinnedApps();
+      updateShelf();
+    }
+    function appWindow(id) {
+      return winForApp(id) || document.querySelector(`.dynamic-app[data-app-id="${CSS.escape(id)}"]`);
+    }
+    function isAppRunning(id) {
+      const w = appWindow(id);
+      return !!w && w.dataset.running === "1";
+    }
+    function runningAppIds() {
+      const ids = [];
+      document.querySelectorAll(".win[data-running='1']").forEach((w) => {
+        const id = w.dataset.appId || (w.id.endsWith("Win") ? w.id.slice(0, -3) : "");
+        if (id && catalogApp(id) && !ids.includes(id)) ids.push(id);
+      });
+      return ids;
+    }
+    function launchShelfApp(id) {
+      const w = appWindow(id);
+      if (w && w.dataset.running === "1") {
+        if (!w.classList.contains("open")) {
+          w.classList.add("open");
+          focusWin(w);
+        } else if (focusedWin === w) {
+          minWin(w.id);
+        } else {
+          focusWin(w);
+        }
+        return;
+      }
+      const app = catalogApp(id);
+      if (!app) return;
+      if (isSystemApp(id)) openApp(id);
+      else openHtmlApp(id, app.name);
+    }
+    function renderPinnedShelf() {
+      const shelf = document.getElementById("shelfCenter");
+      if (!shelf) return;
+      const ids = [...pinnedApps, ...runningAppIds().filter((id) => !pinnedApps.includes(id))];
+      shelf.innerHTML = ids.map((id) => {
+        const app = catalogApp(id);
+        if (!app) return "";
+        const pinned = isPinned(id);
+        return `<button class="shelf-app" draggable="${pinned}" data-app="${id}" data-pinned="${pinned ? 1 : 0}" title="${esc(app.name)}">${iconHtml(id)}</button>`;
+      }).join("");
+
+      shelf.querySelectorAll(".shelf-app").forEach((b) => {
+        const id = b.dataset.app;
+        b.addEventListener("click", () => launchShelfApp(id));
+        b.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openShelfAppMenu(id, e.clientX, e.clientY);
+        });
+        if (b.dataset.pinned === "1") {
+          b.addEventListener("dragstart", (e) => {
+            b.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", id);
+          });
+          b.addEventListener("dragend", () => {
+            shelf.querySelectorAll(".shelf-app").forEach(x => x.classList.remove("dragging", "drag-over"));
+          });
+          b.addEventListener("dragover", (e) => {
+            if (!e.dataTransfer.types.includes("text/plain")) return;
+            e.preventDefault();
+            b.classList.add("drag-over");
+          });
+          b.addEventListener("dragleave", () => b.classList.remove("drag-over"));
+          b.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const from = e.dataTransfer.getData("text/plain");
+            const to = id;
+            if (!isPinned(from) || !isPinned(to) || from === to) return;
+            const oldIndex = pinnedApps.indexOf(from);
+            const newIndex = pinnedApps.indexOf(to);
+            pinnedApps.splice(oldIndex, 1);
+            pinnedApps.splice(newIndex, 0, from);
+            savePinnedApps();
+            updateShelf();
+          });
+        }
+      });
+    }
+
+    let shelfMenuApp = null;
+    function openShelfAppMenu(id, x, y) {
+      shelfMenuApp = id;
+      const menu = document.getElementById("shelfAppMenu");
+      const pin = document.getElementById("shelfMenuPin");
+      const open = document.getElementById("shelfMenuOpen");
+      if (!menu || !pin || !open) return;
+      pin.textContent = isPinned(id) ? "Unpin from shelf" : "Pin to shelf";
+      open.textContent = isAppRunning(id) ? "Show window" : "Open";
+      menu.style.left = Math.min(x, innerWidth - 230) + "px";
+      menu.style.top = Math.min(y, innerHeight - 110) + "px";
+      menu.classList.add("open");
+    }
+    function closeShelfAppMenu() {
+      document.getElementById("shelfAppMenu")?.classList.remove("open");
+      shelfMenuApp = null;
+    }
+    document.getElementById("shelfMenuOpen")?.addEventListener("click", () => {
+      const id = shelfMenuApp;
+      closeShelfAppMenu();
+      if (id) launchShelfApp(id);
+    });
+    document.getElementById("shelfMenuPin")?.addEventListener("click", () => {
+      const id = shelfMenuApp;
+      closeShelfAppMenu();
+      if (!id) return;
+      isPinned(id) ? unpinApp(id) : pinApp(id);
+    });
+
+    function systemAppHtml(a) {
+      return `<!doctype html><meta charset="utf-8"><title>${a.name}</title><body data-unlim8ted-system-app="${a.id}"><script>parent.postMessage({type:'unlim8ted-open-system-app',id:'${a.id}'},'*')<\/script></body>`;
+    }
+    const REMOVED_DEFAULT_APPS_KEY = "u8-removed-default-apps";
+    function removedDefaultApps() {
+      try {
+        return new Set(JSON.parse(localStorage.getItem(REMOVED_DEFAULT_APPS_KEY)) || []);
+      } catch {
+        return new Set();
+      }
+    }
+    function saveRemovedDefaultApps(s) {
+      localStorage.setItem(REMOVED_DEFAULT_APPS_KEY, JSON.stringify([...s]));
+    }
+    async function fetchBundledApp(a) {
+      if (!a.localPath) throw Error("No local app file");
+      let r = await fetch(a.localPath, { cache: "no-store" });
+      if (!r.ok) throw Error(`Local app HTTP ${r.status}`);
+      return new Uint8Array(await r.arrayBuffer());
+    }
+    async function seedApps() {
+      for (const id of INITIAL_PINNED_APPS) {
+        const a = catalogApp(id);
+        if (!a || !isSystemApp(id)) continue;
+        let base = `/Applications/${a.id}.app/`;
+        if (!(await DB.get(base + "manifest.json")))
+          await DB.put(base + "manifest.json", new TextEncoder().encode(JSON.stringify(a)));
+        if (!(await DB.get(base + "index.html")))
+          await DB.put(base + "index.html", new TextEncoder().encode(systemAppHtml(a)));
+      }
+      let removed = removedDefaultApps();
+      for (const a of catalog.filter((x) => x.default && !removed.has(x.id))) {
+        let base = `/Applications/${a.id}.app/`;
+        if (!(await DB.get(base + "manifest.json")))
+          await DB.put(base + "manifest.json", new TextEncoder().encode(JSON.stringify(a)));
+        if (!(await DB.get(base + "index.html")))
+          try {
+            await DB.put(base + "index.html", await fetchBundledApp(a));
+          } catch (e) {
+            console.warn("default app seed failed", a.id, e);
+          }
+      }
+    }
+    // Catalog SVGs can contain reusable IDs (gradients, masks, clip paths, etc.).
+    // Namespace every rendered copy so the same icon can safely appear in the shelf,
+    // launcher, and other UI at the same time without ID collisions.
+    let iconInstance = 0;
+    function namespaceCatalogSvg(svg, appId = "icon") {
+      if (!svg) return "";
+
+      const template = document.createElement("template");
+      template.innerHTML = String(svg).trim();
+      const root = template.content.firstElementChild;
+      if (!root) return "";
+
+      const prefix = `u8-${String(appId).replace(/[^a-zA-Z0-9_-]/g, "-")}-${++iconInstance}-`;
+      const ids = new Map();
+
+      root.querySelectorAll("[id]").forEach((el) => {
+        const oldId = el.id;
+        const newId = prefix + oldId;
+        ids.set(oldId, newId);
+        el.id = newId;
+      });
+
+      if (ids.size) {
+        const elements = [root, ...root.querySelectorAll("*")];
+        for (const el of elements) {
+          for (const attr of [...el.attributes]) {
+            let value = attr.value;
+            for (const [oldId, newId] of ids) {
+              value = value
+                .replaceAll(`url(#${oldId})`, `url(#${newId})`)
+                .replaceAll(`url("#${oldId}")`, `url("#${newId}")`)
+                .replaceAll(`url('#${oldId}')`, `url('#${newId}')`);
+              if ((attr.name === "href" || attr.name === "xlink:href") && value === `#${oldId}`) {
+                value = `#${newId}`;
+              }
+            }
+            if (value !== attr.value) el.setAttribute(attr.name, value);
+          }
+        }
+      }
+
+      return root.outerHTML;
+    }
+
+    const iconHtml = (id) => {
+      const app = catalogApp(id) || catalog.find((a) => a.icon === id);
+      return `<span class="app-icon">${namespaceCatalogSvg(app?.svg || "", app?.id || id)}</span>`;
+    };
+    function renderCatalogIcons(root = document) {
+      root.querySelectorAll("[data-catalog-icon]").forEach((el) => {
+        const app = catalogApp(el.dataset.catalogIcon);
+        el.innerHTML = namespaceCatalogSvg(app?.svg || "", app?.id || el.dataset.catalogIcon);
+      });
+    }
+    renderPinnedShelf();
+    renderCatalogIcons();
+
+    let ztop = 30,
+      focusedWin = null;
+    const SHELF_H = 56;
+    function winForApp(id) {
+      return document.getElementById(id + "Win");
+    }
+    function openWin(id) {
+      let w = document.getElementById(id);
+      if (!w) return;
+      w.dataset.running = "1";
+      w.dataset.running = "1";
+      w.classList.add("open");
+      focusWin(w);
+      updateShelf();
+    }
+    function focusWin(w) {
+      document.querySelectorAll(".win").forEach((x) => x.classList.remove("focused"));
+      w.classList.add("focused");
+      w.style.zIndex = ++ztop;
+      focusedWin = w;
+      updateShelf();
+    }
+    function closeWin(id) {
+      let w = document.getElementById(id);
+      if (!w) return;
+      w.dataset.running = "0";
+      w.classList.remove("open", "focused");
+      if (focusedWin === w) focusedWin = null;
+      updateShelf();
+    }
+    function minWin(id) {
+      let w = document.getElementById(id);
+      if (!w) return;
+      w.dataset.running = "1";
+      w.classList.remove("open", "focused");
+      if (focusedWin === w) focusedWin = null;
+      updateShelf();
+    }
+    function maxWin(id, force = false) {
+      let w = document.getElementById(id);
+      if (!w) return;
+      if (w.dataset.max && !force) {
+        let p = JSON.parse(w.dataset.prev || "{}");
+        Object.assign(w.style, p);
+        w.dataset.max = "";
+      } else if (!w.dataset.max) {
+        w.dataset.prev = JSON.stringify({
+          left: w.style.left,
+          top: w.style.top,
+          width: w.style.width,
+          height: w.style.height,
+          borderRadius: w.style.borderRadius,
+          resize: w.style.resize,
+        });
+        Object.assign(w.style, {
+          left: "0px",
+          top: "0px",
+          width: "100%",
+          height: `calc(100% - ${SHELF_H}px)`,
+          borderRadius: "0px",
+          resize: "none",
+        });
+        w.dataset.max = "1";
+      }
+      w.classList.add("open");
+      focusWin(w);
+      if (id === "browserWin") requestAnimationFrame(notifyBrowserResize);
+    }
+    function updateShelf() {
+      renderPinnedShelf();
+      document.querySelectorAll(".shelf-app[data-app]").forEach((b) => {
+        const w = appWindow(b.dataset.app);
+        const running = !!w && w.dataset.running === "1";
+        b.classList.toggle("running", running);
+        b.classList.toggle("active", running && focusedWin === w && w.classList.contains("open"));
+        b.setAttribute("aria-pressed", running && focusedWin === w ? "true" : "false");
+      });
+    }
+    function clampWindow(w) {
+      if (w.dataset.max) return;
+      let deskH = Math.max(0, innerHeight - SHELF_H),
+        ww = Math.min(w.offsetWidth, innerWidth),
+        wh = Math.min(w.offsetHeight, deskH);
+      let left = Math.max(0, Math.min(innerWidth - ww, parseFloat(w.style.left) || w.offsetLeft || 0));
+      let top = Math.max(0, Math.min(deskH - wh, parseFloat(w.style.top) || w.offsetTop || 0));
+      w.style.left = left + "px";
+      w.style.top = top + "px";
+      if (w.offsetWidth > innerWidth) w.style.width = innerWidth + "px";
+      if (w.offsetHeight > deskH) w.style.height = deskH + "px";
+    }
+    function wireWindow(w) {
+      if (!w || w.dataset.wired) return;
+      w.dataset.wired = "1";
+      w.addEventListener("pointerdown", () => focusWin(w));
+
+      const bar = w.querySelector(".dragbar");
+      if (!bar) return;
+
+      let drag = null;
+
+      const move = (e) => {
+        if (!drag || e.pointerId !== drag.pointerId) return;
+
+        const deskH = Math.max(0, innerHeight - SHELF_H);
+        const ww = Math.min(w.offsetWidth, innerWidth);
+        const wh = Math.min(w.offsetHeight, deskH);
+
+        w.style.left = Math.max(
+          0,
+          Math.min(Math.max(0, innerWidth - ww), e.clientX - drag.ox)
+        ) + "px";
+        w.style.top = Math.max(
+          0,
+          Math.min(Math.max(0, deskH - wh), e.clientY - drag.oy)
+        ) + "px";
+      };
+
+      const stop = (e) => {
+        if (!drag || (e.pointerId != null && e.pointerId !== drag.pointerId)) return;
+        drag = null;
+        document.removeEventListener("pointermove", move, true);
+        document.removeEventListener("pointerup", stop, true);
+        document.removeEventListener("pointercancel", stop, true);
+        clampWindow(w);
+      };
+
+      bar.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest("button,.tab,input,select,textarea,a")) return;
+
+        focusWin(w);
+
+        // If maximized, restore first, put the restored window underneath
+        // the pointer, then continue THIS SAME pointer gesture as a drag.
+        if (w.dataset.max) {
+          const xRatio = Math.max(.08, Math.min(.92, e.clientX / Math.max(1, innerWidth)));
+          maxWin(w.id);
+
+          const ww = w.offsetWidth;
+          const deskH = Math.max(0, innerHeight - SHELF_H);
+          const wh = Math.min(w.offsetHeight, deskH);
+
+          w.style.left = Math.max(
+            0,
+            Math.min(Math.max(0, innerWidth - ww), e.clientX - ww * xRatio)
+          ) + "px";
+          w.style.top = Math.max(
+            0,
+            Math.min(Math.max(0, deskH - wh), e.clientY - 18)
+          ) + "px";
+        }
+
+        drag = {
+          pointerId: e.pointerId,
+          ox: e.clientX - w.offsetLeft,
+          oy: e.clientY - w.offsetTop
+        };
+
+        // Listen on document so the drag does not stop when the pointer
+        // leaves the title bar while moving the window.
+        document.addEventListener("pointermove", move, true);
+        document.addEventListener("pointerup", stop, true);
+        document.addEventListener("pointercancel", stop, true);
+        e.preventDefault();
+      });
+
+      bar.addEventListener("dblclick", (e) => {
+        if (!e.target.closest("button,.tab,input,select,textarea,a")) maxWin(w.id);
+      });
+    }
+    function initWindowInteractions() {
+      document.querySelectorAll(".win").forEach((w) => wireWindow(w));
+      addEventListener("resize", () => document.querySelectorAll(".win.open").forEach(clampWindow));
+    }
+    function closePanels() {
+      document.getElementById("launcher").classList.remove("open");
+      document.getElementById("quick").classList.remove("open");
+      document.getElementById("tray").classList.remove("open");
+    }
+    function toggleLauncher() {
+      let l = document.getElementById("launcher"),
+        open = !l.classList.contains("open");
+      closePanels();
+      if (open) {
+        l.classList.add("open");
+        document.getElementById("launchSearch").focus();
+      }
+    }
+    function toggleQuick() {
+      let q = document.getElementById("quick"),
+        open = !q.classList.contains("open");
+      closePanels();
+      if (open) {
+        q.classList.add("open");
+        document.getElementById("tray").classList.add("open");
+      }
+    }
+    function closeContext() {
+      document.getElementById("contextmenu").classList.remove("open");
+      closeShelfAppMenu();
+    }
+    function toggleShelfAutohide() {
+      document.body.classList.toggle("autohide");
+    }
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+    window.addEventListener("pointerdown", (e) => {
+      if (!e.target.closest("#launcher,.launcher-btn,#quick,.shelf-tray,#contextmenu")) closePanels();
+      if (!e.target.closest("#contextmenu,#shelfAppMenu")) closeContext();
+    });
+    document.getElementById("wallpaper").addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      let m = document.getElementById("contextmenu");
+      m.style.left = Math.min(e.clientX, innerWidth - 230) + "px";
+      m.style.top = Math.min(e.clientY, innerHeight - 170) + "px";
+      m.classList.add("open");
+    });
+    async function renderApps(filter = "") {
+      let g = document.getElementById("appgrid");
+      g.innerHTML = "";
+      let q = filter.trim().toLowerCase();
+      for (const c of catalog) {
+        if (q && !c.name.toLowerCase().includes(q)) continue;
+        if (!(await DB.get(`/Applications/${c.id}.app/index.html`))) continue;
+        const action = isSystemApp(c.id)
+          ? `openApp('${c.id}')`
+          : `openHtmlApp('${c.id}','${c.name.replace(/'/g, "\\'")}')`;
+        g.insertAdjacentHTML(
+          "beforeend",
+          `<div class="appbtn" data-app="${c.id}" onclick="${action};closePanels()" oncontextmenu="event.preventDefault();event.stopPropagation();openShelfAppMenu('${c.id}',event.clientX,event.clientY)">${iconHtml(c.id)}<span>${c.name}</span></div>`
+        );
+      }
+    }
+    document.getElementById("launchSearch").addEventListener("input", (e) => renderApps(e.target.value));
+    function openApp(id) {
+      openWin(id + "Win");
+      closePanels();
+      if (id === "browser") {
+        notifyBrowserResize();
+        requestAnimationFrame(() =>
+          browserFrame?.contentWindow?.postMessage({ type: "unlim8ted-browser-ensure-tab" }, "*")
+        );
+      }
+      if (id === "files") document.getElementById("filesFrame")?.contentWindow?.postMessage({ type: "unlim8ted-files-refresh" }, "*");
+      if (id === "terminal") bootLinux();
+    }
+    window.addEventListener("message", (e) => {
+      if (e.data?.type === "unlim8ted-open-system-app" && isSystemApp(e.data.id))
+        openApp(e.data.id);
+      if (e.data?.type === "unlim8ted-open-url") console.warn("Blocked app URL redirect", e.data.url);
+      if (e.data?.type === "unlim8ted-python-run") runPythonInLinux(String(e.data.code || ""), e.source);
+      if (e.data?.type?.startsWith("unlim8ted-code-")) handleCodeMessage(e);
+      if (e.data?.type === "unlim8ted-apps-changed") { renderApps(); updateShelf(); document.getElementById("filesFrame")?.contentWindow?.postMessage({ type: "unlim8ted-files-refresh" }, "*"); }
+    });
+    async function openHtmlApp(id, name) {
+      let f = await DB.get(`/Applications/${id}.app/index.html`);
+      if (!f) return;
+      let old = document.querySelector(`.dynamic-app[data-app-id="${CSS.escape(id)}"]`);
+      if (old) {
+        old.dataset.running = "1";
+        old.classList.add("open");
+        focusWin(old);
+        updateShelf();
+        return;
+      }
+      let win = document.createElement("div");
+      win.id = "dyn_" + id + "_" + Date.now();
+      win.dataset.appId = id;
+      win.dataset.running = "1";
+      win.className = "win open dynamic-app";
+      let sizeMap = {
+        minecraft: { l: "4%", t: "3%", w: "92%", h: "86%" },
+        terraria: { l: "4%", t: "3%", w: "92%", h: "86%" },
+        "animal-crossing": { l: "4%", t: "3%", w: "92%", h: "86%" },
+        cuphead: { l: "4%", t: "3%", w: "92%", h: "86%" },
+        "doom-3": { l: "4%", t: "3%", w: "92%", h: "86%" },
+        "untitled-goose-game": { l: "4%", t: "3%", w: "92%", h: "86%" },
+        worldbox: { l: "4%", t: "3%", w: "92%", h: "86%" },
+        celeste: { l: "4%", t: "3%", w: "92%", h: "86%" },
+        "hollow-knight": { l: "4%", t: "3%", w: "92%", h: "86%" },
+        "hollow-knight-silksong": { l: "4%", t: "3%", w: "92%", h: "86%" },
+        python: { l: "12%", t: "7%", w: "76%", h: "78%" },
+        vscode: { l: "8%", t: "5%", w: "84%", h: "82%" },
+        ffmpeg: { l: "10%", t: "7%", w: "80%", h: "78%" },
+        freecad: { l: "4%", t: "3%", w: "92%", h: "86%" },
+        audacity: { l: "8%", t: "6%", w: "84%", h: "80%" },
+        openscad: { l: "6%", t: "5%", w: "88%", h: "82%" },
+        kicad: { l: "4%", t: "3%", w: "92%", h: "86%" },
+        blender: { l: "4%", t: "3%", w: "92%", h: "86%" },
+        "vm-emulation": { l: "6%", t: "5%", w: "88%", h: "82%" },
+        godot: { l: "4%", t: "3%", w: "92%", h: "86%" },
+      };
+      let sizes = sizeMap[id] || { l: "18%", t: "10%", w: "64%", h: "72%" };
+      win.style.cssText = `left:${sizes.l};top:${sizes.t};width:${sizes.w};height:${sizes.h};z-index:${++ztop}`;
+      let manifest = await DB.get(`/Applications/${id}.app/manifest.json`),
+        app = {};
+      try {
+        if (manifest) app = JSON.parse(new TextDecoder().decode(new Uint8Array(manifest.data)));
+      } catch { }
+      let current = catalog.find((x) => x.id === id) || {};
+      app = { ...app, ...current };
+      let objectUrl = "";
+      let src = app.localPath || "";
+      if (!src) {
+        let html = new TextDecoder().decode(new Uint8Array(f.data));
+        objectUrl = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+        src = objectUrl;
+      }
+      win.innerHTML = `<div class="app-titlebar dragbar"><div class="app-title">${esc(name)}</div><div class="window-controls"><button class="min"></button><button class="max"></button><button class="close">×</button></div></div><iframe allow="fullscreen; clipboard-read; clipboard-write; gamepad" style="border:0;flex:1;background:var(--surface)" src="${esc(src)}"></iframe>`;
+      document.querySelector(".desktop").append(win);
+      win.querySelector(".close").onclick = () => {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        win.dataset.running = "0";
+        win.remove();
+        if (focusedWin === win) focusedWin = null;
+        updateShelf();
+      };
+      win.querySelector(".min").onclick = () => minWin(win.id);
+      win.querySelector(".max").onclick = () => maxWin(win.id);
+      wireWindow(win);
+      clampWindow(win);
+      focusWin(win);
+      updateShelf();
+    }
+    let currentPath = "/home/user"; // retained for compatibility with shell bridges
+    async function handleCodeMessage(e) {
+      let d = e.data || {},
+        reply = (o) => e.source?.postMessage({ id: d.id, ...o }, "*");
+      try {
+        if (d.type === "unlim8ted-code-list") {
+          let base = String(d.path || "/home/user").replace(/\/+$/, "") || "/";
+          let all = await DB.all(),
+            seen = new Map();
+          for (const f of all) {
+            if (f.path === base || !f.path.startsWith(base + "/")) continue;
+            let rest = f.path.slice(base.length + 1),
+              first = rest.split("/")[0];
+            if (!first || first === ".keep") continue;
+            let dir = rest.includes("/");
+            if (!seen.has(first)) seen.set(first, { name: first, path: base + "/" + first, dir });
+          }
+          reply({
+            ok: true,
+            items: [...seen.values()].sort(
+              (a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name)
+            ),
+          });
+        } else if (d.type === "unlim8ted-code-read") {
+          let f = await DB.get(String(d.path || "")),
+            bytes = f ? new Uint8Array(f.data) : null;
+          reply({
+            ok: !!f,
+            text: f ? new TextDecoder().decode(bytes) : "",
+            bytes,
+            error: f ? "" : "File not found",
+          });
+        } else if (d.type === "unlim8ted-code-write") {
+          let p = String(d.path || ""),
+            data = d.bytes ? new Uint8Array(d.bytes) : new TextEncoder().encode(String(d.text || ""));
+          await DB.put(p, data);
+          await syncAllToLinux();
+          reply({ ok: true });
+        } else if (d.type === "unlim8ted-code-run") {
+          await bootLinux();
+          await waitLinuxReady();
+          let r = await linuxExec(String(d.cmd || ""), 180000);
+          await syncLinuxTreeToDB("/home/user");
+          reply({ ok: true, output: r.output, code: r.code });
+        }
+      } catch (err) {
+        reply({ ok: false, error: String(err.message || err) });
+      }
+    }
+
+    function esc(s) {
+      return String(s).replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+      );
+    }
+    // Settings/theme
+    let themeMode = localStorage.getItem("u8-theme") || "dark";
+    let effectiveTheme = "dark";
+    function applyTheme() {
+      effectiveTheme =
+        themeMode === "auto"
+          ? matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light"
+          : themeMode;
+      document.documentElement.dataset.theme = effectiveTheme;
+      let dark = effectiveTheme === "dark";
+      document.getElementById("darkTile")?.classList.toggle("on", dark);
+      if (document.getElementById("darkState"))
+        document.getElementById("darkState").textContent = dark ? "On" : "Off";
+    }
+    function setTheme(mode) {
+      themeMode = mode;
+      localStorage.setItem("u8-theme", mode);
+      applyTheme();
+    }
+    function toggleDarkQuick() {
+      setTheme(effectiveTheme === "dark" ? "light" : "dark");
+    }
+    matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+      if (themeMode === "auto") applyTheme();
+    });
+    function setWallpaper(n, el) {
+      localStorage.setItem("u8-wallpaper", n);
+      let w = document.getElementById("wallpaper");
+      w.className = "wallpaper wallpaper-" + n;
+      let maps = {
+        1: `radial-gradient(58% 70% at 75% 42%,#2554b9 0 24%,transparent 25%),radial-gradient(54% 68% at 72% 40%,#172968 0 35%,transparent 36%),radial-gradient(45% 66% at 41% 36%,#663448 0 28%,transparent 29%),radial-gradient(60% 80% at 48% 65%,#151b37 0 54%,#0f1117 76%)`,
+        2: `radial-gradient(circle at 25% 60%,#0b7b83 0 15%,#0f2631 46%,#101318 78%)`,
+        3: `linear-gradient(135deg,#2d2244,#111827 52%,#17304f)`,
+      };
+      w.style.background = maps[n] || maps[1];
+    }
+    // Actual text-only Linux via v86. host9p exposes the same /Applications and /home/user tree used by Files.
+    let linux = null,
+      linuxBooting = null,
+      linuxReady = false,
+      linuxMounting = false,
+      linuxTail = "",
+      linuxReadyWaiters = [],
+      linuxExecWaiters = [],
+      linuxPersistTimer = null,
+      linuxPersisting = false;
+    function waitLinuxReady(timeout = 5 * 60 * 1000) {
+      if (linuxReady) return Promise.resolve();
+      return new Promise((res, rej) => {
+        let t = setTimeout(() => rej(Error("Linux boot timed out")), timeout);
+        linuxReadyWaiters.push(() => {
+          clearTimeout(t);
+          res();
+        });
+      });
+    }
+    function feedLinuxWaiters(c) {
+      if (!linuxReady && linuxTail.includes("U8_HOST9P_READY")) {
+        linuxReady = true;
+        linuxMounting = false;
+        postTerminal({ type: "unlim8ted-terminal-status", text: "Linux • host9p" });
+        startLinuxPersistence();
+        const waiters = linuxReadyWaiters.splice(0);
+        for (const done of waiters) done();
+      }
+      for (const w of [...linuxExecWaiters]) {
+        w.buf += c;
+        let i = w.buf.indexOf(w.token + ":");
+        if (i >= 0) {
+          let rest = w.buf.slice(i + w.token.length + 1),
+            m = rest.match(/(-?\d+)/);
+          if (m) {
+            linuxExecWaiters.splice(linuxExecWaiters.indexOf(w), 1);
+            clearTimeout(w.timer);
+            let code = Number(m[1]),
+              output = w.buf.slice(0, i).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+            w.resolve({ code, output });
+          }
+        }
+      }
+    }
+    function linuxExec(cmd, timeout = 120000) {
+      return new Promise(async (resolve, reject) => {
+        await waitLinuxReady();
+        let raw = "U8DONE" + Math.random().toString(36).slice(2),
+          a = raw.slice(0, 7),
+          b = raw.slice(7);
+        let w = {
+          token: raw,
+          buf: "",
+          resolve,
+          reject,
+          timer: setTimeout(() => {
+            linuxExecWaiters.splice(linuxExecWaiters.indexOf(w), 1);
+            reject(Error("Linux command timed out"));
+          }, timeout),
+        };
+        linuxExecWaiters.push(w);
+        linux.serial0_send(`${cmd}; __u8ec=$?; printf '\\n${a}''${b}:%s\\n' "$__u8ec"\n`);
+      });
+    }
+    async function persistLinuxHome() {
+      if (!linuxReady || linuxPersisting) return;
+      linuxPersisting = true;
+      try {
+        await syncLinuxTreeToDB("/home/user");
+      } catch (error) {
+        console.warn("Linux home persistence failed:", error);
+      } finally {
+        linuxPersisting = false;
+      }
+    }
+    function startLinuxPersistence() {
+      if (linuxPersistTimer) return;
+      linuxPersistTimer = setInterval(persistLinuxHome, 30000);
+      addEventListener("beforeunload", persistLinuxHome);
+      addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") persistLinuxHome();
+      });
+    }
+    async function bootLinux() {
+      if (linux) return waitLinuxReady();
+      if (linuxBooting) return linuxBooting;
+      linuxBooting = (async () => {
+        postTerminal({ type: "unlim8ted-terminal-status", text: "Starting Linux…" });
+        if (!window.V86) await loadScript(RESOURCE_URLS.v86Js);
+        let wasm = RESOURCE_URLS.v86Wasm,
+          kernel = RESOURCE_URLS.kernel,
+          bios = RESOURCE_URLS.bios,
+          vga = RESOURCE_URLS.vgabios;
+        linux = new V86({
+          wasm_path: wasm,
+          memory_size: 96 * 1024 * 1024,
+          vga_memory_size: 2 * 1024 * 1024,
+          bios: { url: bios },
+          vga_bios: { url: vga },
+          bzimage: { url: kernel },
+          filesystem: {},
+          net_device: { type: "virtio", relay_url: "wisps://wisp.mercurywork.shop/" },
+          autostart: true,
+          disable_mouse: true,
+          disable_speaker: true,
+        });
+        linux.add_listener("serial0-output-byte", (b) => {
+          let c = String.fromCharCode(b);
+          if (c !== "\r") {
+            postTerminal({ type: "unlim8ted-terminal-output", text: c });
+            linuxTail = (linuxTail + c).slice(-4000);
+            feedLinuxWaiters(c);
+          }
+          if (
+            !linuxReady &&
+            !linuxMounting &&
+            (linuxTail.endsWith("~% ") || linuxTail.endsWith("# ") || linuxTail.endsWith("$ "))
+          ) {
+            linuxMounting = true;
+            (async () => {
+  await syncAllToLinux();
+
+  linux.serial0_send(
+    "mkdir -p /mnt/unlim8ted; " +
+    "mount -t 9p -o trans=virtio,version=9p2000.L host9p /mnt/unlim8ted 2>/dev/null || true; " +
+    "mkdir -p /usr/local/bin; " +
+    "p=$(find /mnt/unlim8ted/home/user/.runtime/python -type f -path '*/bin/python' 2>/dev/null | head -1); " +
+    "if [ -n \"$p\" ]; then printf '#!/bin/sh\\nexec \"%s\" \"$@\"\\n' \"$p\" > /usr/local/bin/python3; chmod +x /usr/local/bin/python3; ln -sf /usr/local/bin/python3 /usr/local/bin/python; fi; " +
+    "cd /mnt/unlim8ted/home/user 2>/dev/null || cd /mnt/unlim8ted; " +
+    "echo U8_HOST9P_READY\n"
+  );
+})();
+          }
+        });
+      })();
+      return linuxBooting;
+    }
+    async function ensureLinuxDir(path) {
+      if (!linux?.fs9p) return;
+      let parts = path.split("/").filter(Boolean),
+        cur = "";
+      for (const part of parts) {
+        cur += "/" + part;
+        try {
+          let info = linux.fs9p.SearchPath(cur);
+          if (info.id === -1 && info.parentid !== -1) linux.fs9p.CreateDirectory(part, info.parentid);
+        } catch { }
+      }
+    }
+    async function syncAllToLinux() {
+      if (!linux) return;
+      let all = await DB.all();
+      for (const f of all) {
+        let rel = f.path;
+        if (f.path.endsWith("/.keep")) {
+          let dir = f.path.slice(0, -6);
+          await ensureLinuxDir(dir);
+          continue;
+        }
+        let slash = rel.lastIndexOf("/");
+        if (slash >= 0) await ensureLinuxDir(rel.slice(0, slash));
+        try {
+          await linux.create_file(rel, new Uint8Array(f.data));
+        } catch { }
+      }
+    }
+    async function syncLinuxTreeToDB(path) {
+      if (!linux?.fs9p) return;
+      let fs = linux.fs9p;
+      let walk = async (p) => {
+        let sp;
+        try {
+          sp = fs.SearchPath(p);
+        } catch {
+          return;
+        }
+        if (sp.id === -1) return;
+        let ino = fs.GetInode(sp.id),
+          kind = ino.mode & 61440;
+        if (kind === 16384) {
+          let names = [];
+          try {
+            names = fs.read_dir(p) || [];
+          } catch { }
+          for (const n of names) {
+            let q = (p === "/" ? "" : p) + "/" + n;
+            await walk(q);
+          }
+        } else if (kind === 32768) {
+          let d = await fs.read_file(p);
+          if (d) await DB.put(p, new Uint8Array(d), Date.now());
+        }
+      };
+      await walk(path);
+    }
+    let networkReady = false;
+    async function ensureLinuxNetwork() {
+      if (networkReady) return;
+      let r = await linuxExec(
+        "ip link set eth0 up 2>/dev/null || true; udhcpc -i eth0 -q -n -t 4 2>/dev/null || true; ip addr show eth0 2>/dev/null",
+        45000
+      );
+      networkReady = /inet /.test(r.output) || true;
+    }
+const PYTHON_URL = "./apps/interpreters/python.zip";
+const PYTHON_INSTALL_TIMEOUT = 45 * 60 * 1000;
+let pythonPath = "";
+
+async function ensurePythonRuntime(source) {
+  await bootLinux();
+  await waitLinuxReady();
+
+  const status = text => source?.postMessage({
+    type: "unlim8ted-python-status",
+    text
+  }, "*");
+
+  status("Checking Python…");
+
+  // Already installed?
+  let probe = await linuxExec(`
+    p=$(find /mnt/unlim8ted/home/user/.runtime/python \
+      -type f -path '*/bin/python' 2>/dev/null | head -1)
+    echo PYTHON=$p
+  `);
+
+  let match = probe.output.match(/PYTHON=(\/[^\r\n]+)/);
+
+  if (match) {
+    pythonPath = match[1].trim();
+    const existing = await linuxExec(`"${pythonPath}" --version 2>&1`, 120000);
+    if (existing.code === 0) {
+      status(existing.output.trim());
+      return pythonPath;
+    }
+    status("Repairing Python...");
+    await linuxExec("rm -rf /mnt/unlim8ted/home/user/.runtime/python", 120000);
+    await DB.delPrefix("/home/user/.runtime/python");
+    pythonPath = "";
+  }
+
+  status("Loading Python…");
+
+  // Browser fetches the bundled ZIP.
+  const response = await fetch(PYTHON_URL, {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to load ${PYTHON_URL} (${response.status})`
+    );
+  }
+
+  const zip = new Uint8Array(await response.arrayBuffer());
+
+  if (!zip.byteLength) {
+    throw new Error("python.zip is empty");
+  }
+
+  status("Copying Python into Linux…");
+
+  /*
+   * IMPORTANT:
+   * Write directly into the v86 filesystem.
+   *
+   * linux paths are /home/user/...
+   * shell sees the mounted version at /mnt/unlim8ted/home/user/...
+   */
+  await linux.create_file(
+    "/home/user/python.zip",
+    zip
+  );
+
+  status("Extracting Python…");
+
+  const result = await linuxExec(`
+    rm -rf /mnt/unlim8ted/home/user/.runtime/python
+
+    mkdir -p /mnt/unlim8ted/home/user/.runtime/python
+
+    unzip -oq \
+      /mnt/unlim8ted/home/user/python.zip \
+      -d /mnt/unlim8ted/home/user/.runtime/python
+
+    p=$(find \
+      /mnt/unlim8ted/home/user/.runtime/python \
+      -type f \
+      -path '*/bin/python' \
+      2>/dev/null |
+      head -1
+    )
+
+    if [ -z "$p" ]; then
+      echo "ERROR:NO_PYTHON"
+      exit 1
+    fi
+
+    chmod +x "$p"
+
+    echo "PYTHON=$p"
+  `, PYTHON_INSTALL_TIMEOUT);
+
+  match = result.output.match(/PYTHON=(\/[^\r\n]+)/);
+
+  if (!match) {
+    console.error("Python install output:", result.output);
+
+    throw new Error(
+      result.output.trim() ||
+      "Python interpreter was not found after extraction"
+    );
+  }
+
+  pythonPath = match[1].trim();
+  await syncLinuxTreeToDB("/home/user/.runtime/python");
+  await DB.put(
+    "/home/user/.runtime/vm-state-restored",
+    new TextEncoder().encode("Linux home is restored from the Unlim8ted virtual filesystem on boot.\n"),
+    Date.now()
+  );
+
+  status("Testing Python…");
+
+  const test = await linuxExec(
+    `"${pythonPath}" --version 2>&1`,
+    120000
+  );
+
+  if (test.code !== 0) {
+    throw new Error(
+      "Python was extracted but could not run:\n" +
+      test.output
+    );
+  }
+
+  status(test.output.trim());
+
+  return pythonPath;
+}
+    async function runPythonInLinux(code, source) {
+      try {
+        let p = await ensurePythonRuntime(source);
+        source?.postMessage({ type: "unlim8ted-python-status", text: "Running in Unlim8ted Linux…" }, "*");
+        let bytes = new TextEncoder().encode(code),
+          bin = "";
+        for (let i = 0; i < bytes.length; i += 0x8000)
+          bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        let b64 = btoa(bin),
+          cmd = `printf '%s' '${b64}' | base64 -d > /tmp/unlim8ted-python.py; '${p}' /tmp/unlim8ted-python.py 2>&1`;
+        let r = await linuxExec(cmd, 180000);
+        let out = r.output.replace(/^.*?base64 -d[^\n]*\n?/s, "").trim();
+        source?.postMessage(
+          { type: "unlim8ted-python-output", text: out || "(no output)", ok: r.code === 0 },
+          "*"
+        );
+      } catch (e) {
+        source?.postMessage(
+          { type: "unlim8ted-python-output", text: String(e.stack || e), ok: false },
+          "*"
+        );
+      }
+    }
+    // Terminal UI is hosted in apps/terminal/index.html.
+
+
+
+    // Direct synchronous view of the SAME Unlim8ted OS VFS for same-origin WASM apps.
+    window.UNLIM8TED_SYNC_VFS = (() => {
+      const norm = p => {
+        const a=[];
+        for (const x of String(p||"/").split("/")) {
+          if (!x || x===".") continue;
+          if (x==="..") a.pop(); else a.push(x);
+        }
+        return "/" + a.join("/");
+      };
+      const get = p => DB.cache.get(norm(p)) || null;
+      const isDir = p => {
+        p=norm(p);
+        if (p==="/") return true;
+        const q=p.replace(/\/+$/,"")+"/";
+        for (const k of DB.cache.keys()) if (k.startsWith(q)) return true;
+        return false;
+      };
+      const stat = p => {
+        p=norm(p); const f=get(p);
+        if (f) return {exists:true,dir:false,size:f.data.byteLength,mtime:f.mtime||0};
+        if (isDir(p)) return {exists:true,dir:true,size:0,mtime:0};
+        return {exists:false,dir:false,size:0,mtime:0};
+      };
+      const list = p => {
+        p=norm(p); const q=p==="/" ? "/" : p+"/", seen=new Map();
+        for (const k of DB.cache.keys()) {
+          if (!k.startsWith(q)) continue;
+          const rest=k.slice(q.length), name=rest.split("/")[0];
+          if (!name || name===".keep") continue;
+          if (!seen.has(name)) seen.set(name,{name,path:norm(q+name),dir:rest.includes("/")||isDir(q+name)});
+        }
+        return [...seen.values()];
+      };
+      const write = (p,data,mtime=Date.now()) => {
+        p=norm(p); data=data instanceof Uint8Array ? data : new Uint8Array(data||[]);
+        DB.put(p,data,mtime).catch(console.error);
+        document.getElementById("filesFrame")?.contentWindow?.postMessage({type:"unlim8ted-files-refresh"},"*");
+      };
+      return {
+        stat, list,
+        read(p) { const f=get(p); if(!f) throw Error("File not found: "+norm(p)); return f.data; },
+        write,
+        mkdir(p) { write(norm(p).replace(/\/+$/,"")+"/.keep",new Uint8Array()); },
+        unlink(p) { DB.del(norm(p)).catch(console.error); },
+        rename(a,b) {
+          a=norm(a); b=norm(b); const f=get(a);
+          if (f) { write(b,f.data,f.mtime); DB.del(a).catch(console.error); return; }
+          const q=a.replace(/\/+$/,"")+"/", moved=[];
+          for (const [k,v] of DB.cache) if(k.startsWith(q)) moved.push([k,v]);
+          for (const [k,v] of moved) { write(b.replace(/\/+$/,"")+"/"+k.slice(q.length),v.data,v.mtime); DB.del(k).catch(console.error); }
+        }
+      };
+    })();
+
+    // Generic VFS API for dynamic HTML apps.
+    // Apps can use absolute virtual paths, or app-relative paths such as "data.data".
+    function unlim8tedAppIdForSource(source) {
+      for (const frame of document.querySelectorAll(".dynamic-app iframe")) {
+        if (frame.contentWindow === source) return frame.closest(".dynamic-app")?.dataset.appId || "";
+      }
+      return "";
+    }
+    function unlim8tedResolveVfsPath(source, path, appRelative) {
+      path = String(path || "");
+      if (appRelative || !path.startsWith("/")) {
+        const appId = unlim8tedAppIdForSource(source);
+        if (!appId) throw Error("VFS request did not come from a dynamic app");
+        path = `/Applications/${appId}.app/${path.replace(/^\/+/, "")}`;
+      }
+      const parts = [];
+      for (const part of path.split("/")) {
+        if (!part || part === ".") continue;
+        if (part === "..") parts.pop();
+        else parts.push(part);
+      }
+      return "/" + parts.join("/");
+    }
+    window.addEventListener("message", async (e) => {
+      const d = e.data || {};
+
+      if (!String(d.type || "").startsWith("unlim8ted-vfs-")) return;
+      
+      const reply = (o) => e.source?.postMessage({
+        type: "unlim8ted-vfs-result",
+        id: d.id,
+        ...o
+      }, "*");
+
+      try {
+        const op = String(d.type).slice("unlim8ted-vfs-".length);
+        const path = unlim8tedResolveVfsPath(e.source, d.path, !!d.appRelative);
+
+        if (op === "read") {
+          const f = await DB.get(path);
+          if (!f) throw Error("File not found: " + path);
+          reply({ ok: true, path, bytes: Array.from(new Uint8Array(f.data || [])), mime: browserMime(path) });
+        } else if (op === "write") {
+          await DB.put(path, new Uint8Array(d.bytes || []));
+          document.getElementById("filesFrame")?.contentWindow?.postMessage({ type: "unlim8ted-files-refresh" }, "*");
+          await syncAllToLinux();
+          reply({ ok: true, path });
+        } else if (op === "list") {
+          reply({ ok: true, path, items: await vfsChildren(path) });
+        } else if (op === "mkdir") {
+          await DB.put(path.replace(/\/+$/, "") + "/.keep", new Uint8Array());
+          await syncAllToLinux();
+          reply({ ok: true, path });
+        } else if (op === "stat") {
+          const f = await DB.get(path);
+          if (f) {
+            reply({ ok: true, path, exists: true, dir: false, size: new Uint8Array(f.data || []).byteLength, mtime: f.mtime || 0, mime: browserMime(path) });
+          } else {
+            const prefix = path.replace(/\/+$/, "") + "/";
+            const all = await DB.all();
+            const dir = all.some(x => x.path.startsWith(prefix));
+            reply({ ok: true, path, exists: dir, dir, size: 0, mtime: 0 });
+          }
+        } else if (op === "tree") {
+          const prefix = path.replace(/\/+$/, "") + "/";
+          const all = await DB.all();
+          const items = all
+            .filter(x => x.path.startsWith(prefix) && !x.path.endsWith("/.keep"))
+            .map(x => ({
+              path: x.path,
+              relative: x.path.slice(prefix.length),
+              size: new Uint8Array(x.data || []).byteLength,
+              mtime: x.mtime || 0
+            }));
+          reply({ ok: true, path, items });
+        } else {
+          throw Error("Unknown VFS operation: " + op);
+        }
+      } catch (err) {
+        reply({ ok: false, error: String(err?.message || err) });
+      }
+    });
+
+    // Split-browser bridge: real shell VFS + resize exposure.
+    const browserFrame = document.getElementById("browserFrame");
+    function notifyBrowserResize() {
+      const host = document.getElementById("browserHost");
+      if (!host || !browserFrame?.contentWindow) return;
+      const r = host.getBoundingClientRect();
+      browserFrame.contentWindow.postMessage({
+        type: "unlim8ted-browser-resize",
+        width: Math.max(1, Math.floor(r.width)),
+        height: Math.max(1, Math.floor(r.height)),
+        dpr: devicePixelRatio || 1
+      }, "*");
+    }
+    new ResizeObserver(notifyBrowserResize).observe(document.getElementById("browserHost"));
+    browserFrame.addEventListener("load", () => {
+      notifyBrowserResize();
+      browserFrame.contentWindow?.postMessage({ type: "unlim8ted-browser-ensure-tab" }, "*");
+    });
+
+    function browserMime(path) {
+      const ext = (path.split(".").pop() || "").toLowerCase();
+      return ({
+        html: "text/html", htm: "text/html", txt: "text/plain", css: "text/css", js: "text/javascript",
+        json: "application/json", svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+        gif: "image/gif", pdf: "application/pdf"
+      })[ext] || "application/octet-stream";
+    }
+    async function vfsChildren(base) {
+      base = String(base || "/home/user").replace(/\/+$/, "") || "/";
+      const all = await DB.all(), seen = new Map();
+      for (const f of all) {
+        if (!f.path.startsWith(base + "/")) continue;
+        const rest = f.path.slice(base.length + 1), first = rest.split("/")[0];
+        if (!first || first === ".keep") continue;
+        const dir = rest.includes("/");
+        if (!seen.has(first)) seen.set(first, { name: first, path: base + "/" + first, dir });
+      }
+      return [...seen.values()].sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name));
+    }
+    function shellPromptModal(title, message, value = "") {
+      return new Promise(resolve => {
+        let back = document.getElementById("shellPromptModal");
+        if (!back) {
+          back = document.createElement("div");
+          back.id = "shellPromptModal";
+          back.style.cssText = "position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.55);z-index:999999;color:#e8eaed;font:14px Arial,sans-serif;text-align:left";
+          back.innerHTML = '<div style="width:min(460px,calc(100vw - 36px));background:#202124;border:1px solid #3c4043;border-radius:8px;padding:18px;box-shadow:0 18px 60px #0008"><h2 id="shellPromptTitle" style="margin:0 0 8px;font-size:18px"></h2><p id="shellPromptText" style="margin:0 0 12px;color:#bdc1c6;white-space:pre-wrap"></p><input id="shellPromptInput" style="width:100%;height:36px;border:1px solid #3c4043;border-radius:6px;background:#101113;color:#e8eaed;padding:0 10px"><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button id="shellPromptCancel" style="height:34px;border:1px solid #3c4043;border-radius:6px;background:#303134;color:#e8eaed;padding:0 14px">Cancel</button><button id="shellPromptOK" style="height:34px;border:1px solid #8ab4f8;border-radius:6px;background:#8ab4f8;color:#10284f;padding:0 14px">OK</button></div></div>';
+          document.body.appendChild(back);
+        }
+        const input = document.getElementById("shellPromptInput");
+        document.getElementById("shellPromptTitle").textContent = title;
+        document.getElementById("shellPromptText").textContent = message;
+        input.value = value;
+        back.style.display = "grid";
+        document.getElementById("shellPromptOK").onclick = () => {
+          back.style.display = "none";
+          resolve(input.value);
+        };
+        document.getElementById("shellPromptCancel").onclick = () => {
+          back.style.display = "none";
+          resolve(null);
+        };
+        input.onkeydown = event => {
+          if (event.key === "Enter") document.getElementById("shellPromptOK").click();
+          if (event.key === "Escape") document.getElementById("shellPromptCancel").click();
+        };
+        requestAnimationFrame(() => {
+          input.focus();
+          input.select();
+        });
+      });
+    }
+    async function shellVirtualPicker(startPath = "/home/user") {
+      // Uses the OS's own virtual tree, never the host browser's native file picker.
+      let path = startPath;
+      for (; ;) {
+        const items = await vfsChildren(path);
+        const menu = ["..", ...items.map(x => (x.dir ? "📁 " : "▤ ") + x.name)];
+        const pick = await shellPromptModal(
+          "Virtual filesystem",
+          path + "\n\n" + menu.map((x, i) => i + ": " + x).join("\n") + "\n\nEnter number",
+          ""
+        );
+        if (pick === null) return "";
+        const n = Number(pick);
+        if (!Number.isInteger(n) || n < 0 || n >= menu.length) continue;
+        if (n === 0) { if (path !== "/") path = path.split("/").slice(0, -1).join("/") || "/"; continue; }
+        const item = items[n - 1];
+        if (item.dir) { path = item.path; continue; }
+        return item.path;
+      }
+    }
+    async function handlePythonStoreMessage(e) {
+  if (!e.data || !e.data.type) return;
+
+  // Only allow Store and the installed Python app to manage the Python runtime.
+  const storeFrame = document.getElementById("storeFrame");
+  const pythonFrame = [...document.querySelectorAll('.dynamic-app[data-app-id="python"] iframe')]
+    .some(frame => e.source === frame.contentWindow);
+  if (e.source !== storeFrame?.contentWindow && !pythonFrame) return;
+
+  // INSTALL PYTHON INTO LINUX VM
+  if (e.data.type === "unlim8ted-python-install") {
+    const requestId = e.data.requestId;
+
+    try {
+      const pythonPath = await ensurePythonRuntime(e.source);
+
+      // Make python/python3 available as normal Linux commands.
+      await linuxExec(`
+        mkdir -p /usr/local/bin
+
+        cat > /usr/local/bin/python3 <<'EOF'
+#!/bin/sh
+exec "${pythonPath}" "$@"
+EOF
+
+        chmod +x /usr/local/bin/python3
+        ln -sf /usr/local/bin/python3 /usr/local/bin/python
+
+        python3 --version
+      `, 5 * 60 * 1000);
+
+      e.source?.postMessage({
+        type: "unlim8ted-python-install-result",
+        requestId,
+        ok: true,
+        path: pythonPath
+      }, "*");
+
+    } catch (error) {
+      console.error("Python VM install failed:", error);
+
+      e.source?.postMessage({
+        type: "unlim8ted-python-install-result",
+        requestId,
+        ok: false,
+        error: error?.message || String(error)
+      }, "*");
+    }
+
+    return;
+  }
+
+  if (e.data.type === "unlim8ted-python-uninstall") {
+    const requestId = e.data.requestId;
+
+    try {
+      await bootLinux();
+      await waitLinuxReady();
+
+      await linuxExec(`
+        rm -rf /mnt/unlim8ted/home/user/.runtime/python
+        rm -f /usr/local/bin/python /usr/local/bin/python3
+      `, 120000);
+
+      await DB.delPrefix("/home/user/.runtime/python");
+      pythonPath = "";
+
+      e.source?.postMessage({
+        type: "unlim8ted-python-uninstall-result",
+        requestId,
+        ok: true
+      }, "*");
+
+    } catch (error) {
+      e.source?.postMessage({
+        type: "unlim8ted-python-uninstall-result",
+        requestId,
+        ok: false,
+        error: error?.message || String(error)
+      }, "*");
+    }
+
+    return;
+  }
+
+  // CHECK WHETHER PYTHON IS INSTALLED
+  if (e.data.type === "unlim8ted-python-check") {
+    const requestId = e.data.requestId;
+
+    try {
+      await bootLinux();
+      await waitLinuxReady();
+
+      const result = await linuxExec(`
+        p=$(
+          command -v python3 2>/dev/null ||
+          command -v python 2>/dev/null ||
+          find /mnt/unlim8ted/home/user/.runtime/python \
+            -type f -path '*/bin/python' 2>/dev/null |
+          head -1
+        )
+
+        if [ -n "$p" ]; then
+          echo "INSTALLED:$p"
+        else
+          echo "NOT_INSTALLED"
+        fi
+      `);
+
+      const match = result.output.match(/INSTALLED:(\/[^\r\n]+)/);
+
+      e.source?.postMessage({
+        type: "unlim8ted-python-check-result",
+        requestId,
+        installed: !!match,
+        path: match ? match[1].trim() : ""
+      }, "*");
+
+    } catch (error) {
+      e.source?.postMessage({
+        type: "unlim8ted-python-check-result",
+        requestId,
+        installed: false,
+        error: error?.message || String(error)
+      }, "*");
+    }
+  }
+}
+    // The Chrome app treats its tab strip/title area as the OS window's drag surface.
+    // It posts drag-start/move/end messages from that top bar; the shell moves browserWin.
+    let browserShellDrag = null;
+    window.addEventListener("message", async e => {
+      if (
+        e.data?.type === "unlim8ted-python-install" ||
+        e.data?.type === "unlim8ted-python-uninstall" ||
+        e.data?.type === "unlim8ted-python-check"
+      ) {
+        handlePythonStoreMessage(e);
+      }
+      const d = e.data || {};
+      if (d.type === "unlim8ted-browser-drag-start") {
+        const w = document.getElementById("browserWin");
+        if (!w) return;
+        focusWin(w);
+        const oldWidth = w.offsetWidth;
+        const ratio = Math.max(.08, Math.min(.92, (d.screenX - window.screenX) / Math.max(1, oldWidth)));
+        if (w.dataset.max) {
+          maxWin("browserWin");
+          const ww = w.offsetWidth;
+          const localX = d.screenX - window.screenX;
+          w.style.left = Math.max(0, Math.min(innerWidth - ww, localX - ww * ratio)) + "px";
+          w.style.top = "0px";
+        }
+        browserShellDrag = { x: d.screenX, y: d.screenY, left: w.offsetLeft, top: w.offsetTop };
+        return;
+      }
+      if (d.type === "unlim8ted-browser-drag-move" && browserShellDrag) {
+        const w = document.getElementById("browserWin");
+        if (!w) return;
+        w.style.left = (browserShellDrag.left + (d.screenX - browserShellDrag.x)) + "px";
+        w.style.top = (browserShellDrag.top + (d.screenY - browserShellDrag.y)) + "px";
+        clampWindow(w);
+        return;
+      }
+      if (d.type === "unlim8ted-browser-drag-end") {
+        const w = document.getElementById("browserWin");
+        if (w) clampWindow(w);
+        browserShellDrag = null;
+        return;
+      }
+      if (d.type === "unlim8ted-browser-window-minimize") { minWin("browserWin"); return; }
+      if (d.type === "unlim8ted-browser-window-maximize") { maxWin("browserWin"); return; }
+      if (d.type === "unlim8ted-browser-window-close") { closeWin("browserWin"); return; }
+      if (!String(d.type || "").startsWith("unlim8ted-browser-fs-")) return;
+      const reply = o => e.source?.postMessage({ type: "unlim8ted-browser-rpc-result", id: d.id, ...o }, "*");
+      try {
+        if (d.type === "unlim8ted-browser-fs-list") {
+          reply({ ok: true, items: await vfsChildren(d.path) });
+        } else if (d.type === "unlim8ted-browser-fs-read") {
+          const f = await DB.get(String(d.path || ""));
+          if (!f) throw Error("File not found");
+          reply({ ok: true, path: f.path, bytes: f.data || [], mime: browserMime(f.path) });
+        } else if (d.type === "unlim8ted-browser-fs-write") {
+          const path = String(d.path || "");
+          if (!path.startsWith("/")) throw Error("Invalid virtual path");
+          await DB.put(path, new Uint8Array(d.bytes || []));
+          document.getElementById("filesFrame")?.contentWindow?.postMessage({ type: "unlim8ted-files-refresh" }, "*");
+          await syncAllToLinux();
+          reply({ ok: true, path });
+        } else if (d.type === "unlim8ted-browser-fs-pick") {
+          reply({ ok: true, path: await shellVirtualPicker(d.path || "/home/user") });
+        } else if (d.type === "unlim8ted-browser-fs-save-path") {
+          let name = await shellPromptModal(
+            "Save to virtual filesystem",
+            (d.directory || "/home/user/Downloads").replace(/\/+$/, "") + "/",
+            d.suggested || "page.html"
+          );
+          if (!name) { reply({ ok: true, path: "" }); return; }
+          name = name.replace(/^\/+/, "").replace(/\.\.(\/|\\)/g, "");
+          reply({ ok: true, path: (d.directory || "/home/user/Downloads").replace(/\/+$/, "") + "/" + name });
+        }
+      } catch (err) { reply({ ok: false, error: String(err.message || err) }); }
+    });
+    const filesFrame = document.getElementById("filesFrame");
+    const terminalFrame = document.getElementById("terminalFrame");
+    function postTerminal(message) { terminalFrame?.contentWindow?.postMessage(message, "*"); }
+    window.addEventListener("message", async (e) => {
+      const d = e.data || {};
+      if (String(d.type || "").startsWith("unlim8ted-files-")) {
+        const reply = o => e.source?.postMessage({ type: "unlim8ted-files-rpc-result", id: d.id, ...o }, "*");
+        try {
+          if (d.type === "unlim8ted-files-list") reply({ ok: true, items: await vfsChildren(d.path) });
+          else if (d.type === "unlim8ted-files-read") {
+            const f = await DB.get(String(d.path || "")); if (!f) throw Error("File not found");
+            reply({ ok: true, path: f.path, bytes: f.data || [] });
+          } else if (d.type === "unlim8ted-files-write") {
+            const path = String(d.path || ""); if (!path.startsWith("/")) throw Error("Invalid path");
+            await DB.put(path, new Uint8Array(d.bytes || [])); await syncAllToLinux(); reply({ ok: true, path });
+          } else if (d.type === "unlim8ted-files-mkdir") {
+            const path = String(d.path || "").replace(/\/+$/, ""); await DB.put(path + "/.keep", new Uint8Array()); await syncAllToLinux(); reply({ ok: true });
+          } else if (d.type === "unlim8ted-files-open-terminal") { openApp("terminal"); reply({ ok: true }); }
+        } catch (err) { reply({ ok: false, error: String(err.message || err) }); }
+        return;
+      }
+      if (d.type === "unlim8ted-terminal-ready") {
+        postTerminal({ type: "unlim8ted-terminal-status", text: linuxReady ? "Linux • host9p" : linuxBooting ? "Starting..." : "Stopped" });
+        return;
+      }
+      if (d.type === "unlim8ted-terminal-command") {
+        if (linuxReady) { linux.serial0_send(String(d.command || "") + "\n"); setTimeout(() => { syncLinuxTreeToDB("/home/user"); syncLinuxTreeToDB("/Applications"); }, 1800); }
+        else postTerminal({ type: "unlim8ted-terminal-output", text: "\n[Still configuring]\n" });
+        return;
+      }
+      if (d.type === "unlim8ted-terminal-backspace" && linuxReady) linux.serial0_send("\b");
+    });
+    // Status area
+    function tick() {
+      let d = new Date(),
+        time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+        date = d.toLocaleDateString([], { month: "short", day: "numeric" });
+      document.getElementById("clock").innerHTML = `${date}<br>${time}`;
+      document.getElementById("qdate").textContent = d.toLocaleDateString([], {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+    }
+    setInterval(tick, 1000);
+    tick();
+    if (navigator.getBattery)
+      navigator
+        .getBattery()
+        .then((b) => {
+          let upd = () => {
+            let p = Math.round(b.level * 100);
+            document.getElementById("batteryPct").textContent = p + "%";
+            document.getElementById("qbattery").textContent = `Battery ${p}%`;
+          };
+          upd();
+          b.addEventListener("levelchange", upd);
+        })
+        .catch(() => { });
+    document
+      .getElementById("brightRange")
+      .addEventListener(
+        "input",
+        (e) => (document.getElementById("wallpaper").style.filter = `brightness(${e.target.value / 100})`)
+      );
+    document.getElementById("wifiState").textContent = navigator.onLine ? "Connected" : "Offline";
+    window.addEventListener("online", () => (document.getElementById("wifiState").textContent = "Connected"));
+    window.addEventListener("offline", () => (document.getElementById("wifiState").textContent = "Offline"));
+    applyTheme();
+    let wp = Number(localStorage.getItem("u8-wallpaper") || 1);
+    setWallpaper(wp);
+    initWindowInteractions();
+    DB.init().then(async () => { await renderApps(); document.getElementById("filesFrame")?.contentWindow?.postMessage({ type: "unlim8ted-files-refresh" }, "*"); });
+  </script>
+</body>
+
+</html>

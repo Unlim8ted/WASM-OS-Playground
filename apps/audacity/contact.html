@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Wavacity Audio Editor</title>
+
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="description" content="Wavacity is a free online audio editor ported from the open-source Audacity project.  No install required.">
+  <meta name="keywords" content="wavacity, wavvy, audio editor, online audio editor, music editor, sound editor, waveform editor, free audio editor, web audio editor">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" type="text/css" href="./css/wavacity_0.1.35.css">
+  <link rel="shortcut icon" href="favicon.ico">
+
+  <!-- Global site tag (gtag.js) - Google Analytics
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-X8B5RE90CJ"></script>
+-->
+  <script async src="js/gtag.js?id=G-X8B5RE90CJ"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-X8B5RE90CJ');
+  </script>
+
+  <!-- Amplitude -->
+  <script type="text/javascript">
+    (function(e,t){var n=e.amplitude||{_q:[],_iq:{}};var r=t.createElement("script")
+    ;r.type="text/javascript"
+    ;r.integrity="sha384-u0hlTAJ1tNefeBKwiBNwB4CkHZ1ck4ajx/pKmwWtc+IufKJiCQZ+WjJIi+7C6Ntm"
+    ;r.crossOrigin="anonymous";r.async=true
+    ;r.src="js/amplitude-8.1.0-min.js"
+    ;r.onload=function(){if(!e.amplitude.runQueuedFunctions){
+    console.log("[Amplitude] Error: could not load SDK")}}
+    ;var i=t.getElementsByTagName("script")[0];i.parentNode.insertBefore(r,i)
+    ;function s(e,t){e.prototype[t]=function(){
+    this._q.push([t].concat(Array.prototype.slice.call(arguments,0)));return this}}
+    var o=function(){this._q=[];return this}
+    ;var a=["add","append","clearAll","prepend","set","setOnce","unset","preInsert","postInsert","remove"]
+    ;for(var c=0;c<a.length;c++){s(o,a[c])}n.Identify=o;var u=function(){this._q=[]
+    ;return this}
+    ;var l=["setProductId","setQuantity","setPrice","setRevenueType","setEventProperties"]
+    ;for(var p=0;p<l.length;p++){s(u,l[p])}n.Revenue=u
+    ;var d=["init","logEvent","logRevenue","setUserId","setUserProperties","setOptOut","setVersionName","setDomain","setDeviceId","enableTracking","setGlobalUserProperties","identify","clearUserProperties","setGroup","logRevenueV2","regenerateDeviceId","groupIdentify","onInit","logEventWithTimestamp","logEventWithGroups","setSessionId","resetSessionId"]
+    ;function v(e){function t(t){e[t]=function(){
+    e._q.push([t].concat(Array.prototype.slice.call(arguments,0)))}}
+    for(var n=0;n<d.length;n++){t(d[n])}}v(n);n.getInstance=function(e){
+    e=(!e||e.length===0?"$default_instance":e).toLowerCase()
+    ;if(!Object.prototype.hasOwnProperty.call(n._iq,e)){n._iq[e]={_q:[]};v(n._iq[e])
+    }return n._iq[e]};e.amplitude=n})(window,document);
+
+    amplitude.getInstance().init("b4b0592fe52ae1b68c051dd09108e5d8");
+  </script>
+ 
+<script type="text/javascript">
+  var decodeQueryString = function (queryString) {
+    var output = {};
+
+    // stuff separated by =, separated by &
+    var re = /([^=&]+)(=([^&]*))?/g;
+    var match;
+    while (match = re.exec(queryString)) {
+      var key = decodeURIComponent(match[1].replace(/\+/g, ' '));
+      // skip parsing keys without values: 'key&k1=v1' -> {"k1": "v1"}
+      if (!match[2]) {
+        continue;
+      }
+      // if missing value = empty string: 'k1=&k2=' -> {"k1": "", "k2": ""}
+      var value = '';
+      if (match[3]) {
+        value = decodeURIComponent(match[3].replace(/\+/g, ' '));
+      }
+
+      output[key] = value;
+    }
+
+    return output;
+  };
+
+  (function() {
+    document.addEventListener('DOMContentLoaded', function () {
+      var languageInput = document.getElementById('language');
+      languageInput.value = navigator.language;
+
+      var userAgentInput = document.getElementById('user-agent');
+      userAgentInput.value = navigator.userAgent;
+
+      var queryParams = decodeQueryString(window.location.search.slice(1)); 
+
+      if ('app_name' in queryParams) {
+        var appNameInput = document.getElementById('app-name');
+        appNameInput.value = queryParams['app_name'];
+      }
+      if ('app_version' in queryParams) {
+        var appVersionInput = document.getElementById('app-version');
+        appVersionInput.value = queryParams['app_version'];
+      }
+      if ('lang' in queryParams) {
+        var languageInput = document.getElementById('language');
+        languageInput.value = queryParams['lang'];
+      }
+      if ('category' in queryParams) {
+        var categoryInput = document.getElementById('category-select');
+        categoryInput.value = queryParams['category'];
+      }
+    }); 
+  })(); 
+
+</script>
+
+</head>
+
+<body>
+
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <div class="title">wavacity</div>
+
+      <div class="nav"> 
+      </div>
+    </div>
+
+    <div id="content">
+      
+<h2>Contact</h2>
+
+<form action="https://apollovibes.com/wavacity/contact-message.html" method="post" id="contact-form">
+  <div class="field-row">
+    <label for="name">Name:</h3>
+    <input type="text" name="name">
+  </div>
+
+  <div class="field-row">
+    <label for="email">Email:</h3>
+    <input type="text" name="email" pattern="[^@\s]+@[^@\s]+\.[^@\s]+" required>
+  </div>
+
+  <div class="field-row">
+    <label for="message">Category:</h3>
+    <select name="category" id="category-select" required>
+      <option value="help">Help</option>
+      <option value="feature">Feature Request</option>
+      <option value="bug">Bug Report</option>
+      <option value="other">Other</option>
+    </select>
+  </div>
+
+  <div class="field-row">
+    <label for="message">Message:</h3>
+    <textarea id="contact-message" name="message" rows=8 required></textarea>
+  </div>
+
+  <input type="hidden" name="app_name" id="app-name" value="Wavacity" />
+  <input type="hidden" name="app_version" id="app-version" />
+  <input type="hidden" name="lang" id="language" />
+  <input type="hidden" name="ua" id="user-agent" />
+
+  <input type="submit" value="Submit" />
+</form>
+
+
+    </div>
+  </div>
+
+  <div id="footer-wrapper">
+    <div id="footer">
+    
+      <div id="footer-copyright">&copy; 2023 Apollo Vibes, LLC</div>
+      <div id="footer-nav">
+        <ul>
+        <li><a href="./contact.html">Contact</a>
+        <li><a href="./privacy.html">Privacy Policy</a>
+        </ul>
+      </div>
+    
+    </div>
+  </div>
+</body>
+
+</html>

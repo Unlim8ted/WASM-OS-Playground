@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Audio Editor</title>
+
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="description" content="Local audio editor workspace.">
+  <meta name="keywords" content="audio editor, music editor, sound editor, waveform editor">
+  <meta name="viewport" content="width=device-width, initial-scale=0.75">
+
+  <meta property="og:title" content="Audio Editor" />
+  <meta property="og:description" content="Local audio editor workspace.">
+  <meta property="og:type" content="website" />
+
+  <link rel="stylesheet" type="text/css" href="css/wavacity_0.1.37.css">
+  <link rel="shortcut icon" href="./favicon.ico">
+
+  <!-- Analytics disabled in the local OS build. -->
+  <script>
+    window.gtag = function(){};
+    window.amplitude = { getInstance: function(){ return { init:function(){}, logEvent:function(){} }; } };
+  </script>
+  <script async data-disabled-src="js/gtag.js?id=G-X8B5RE90CJ"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-X8B5RE90CJ');
+  </script>
+
+  <!-- Amplitude -->
+  <script type="text/plain" data-disabled="amplitude">
+    (function(e,t){var n=e.amplitude||{_q:[],_iq:{}};var r=t.createElement("script")
+    ;r.type="text/javascript"
+    ;r.integrity="sha384-u0hlTAJ1tNefeBKwiBNwB4CkHZ1ck4ajx/pKmwWtc+IufKJiCQZ+WjJIi+7C6Ntm"
+    ;r.crossOrigin="anonymous";r.async=true
+    ;r.src="js/amplitude-8.1.0-min.js"
+    ;r.onload=function(){if(!e.amplitude.runQueuedFunctions){
+    console.log("[Amplitude] Error: could not load SDK")}}
+    ;var i=t.getElementsByTagName("script")[0];i.parentNode.insertBefore(r,i)
+    ;function s(e,t){e.prototype[t]=function(){
+    this._q.push([t].concat(Array.prototype.slice.call(arguments,0)));return this}}
+    var o=function(){this._q=[];return this}
+    ;var a=["add","append","clearAll","prepend","set","setOnce","unset","preInsert","postInsert","remove"]
+    ;for(var c=0;c<a.length;c++){s(o,a[c])}n.Identify=o;var u=function(){this._q=[]
+    ;return this}
+    ;var l=["setProductId","setQuantity","setPrice","setRevenueType","setEventProperties"]
+    ;for(var p=0;p<l.length;p++){s(u,l[p])}n.Revenue=u
+    ;var d=["init","logEvent","logRevenue","setUserId","setUserProperties","setOptOut","setVersionName","setDomain","setDeviceId","enableTracking","setGlobalUserProperties","identify","clearUserProperties","setGroup","logRevenueV2","regenerateDeviceId","groupIdentify","onInit","logEventWithTimestamp","logEventWithGroups","setSessionId","resetSessionId"]
+    ;function v(e){function t(t){e[t]=function(){
+    e._q.push([t].concat(Array.prototype.slice.call(arguments,0)))}}
+    for(var n=0;n<d.length;n++){t(d[n])}}v(n);n.getInstance=function(e){
+    e=(!e||e.length===0?"$default_instance":e).toLowerCase()
+    ;if(!Object.prototype.hasOwnProperty.call(n._iq,e)){n._iq[e]={_q:[]};v(n._iq[e])
+    }return n._iq[e]};e.amplitude=n})(window,document);
+
+    amplitude.getInstance().init("b4b0592fe52ae1b68c051dd09108e5d8");
+  </script>
+</head>
+
+<body class="overflow-hidden">
+  <div id="splash-screen">
+    <div id="splash-header">
+      <h1 id="splash-title">Audio Editor</h1>
+      <div id="splash-menu" hidden>
+        <a href="./support.html" target="_blank" rel="noopener">Support</a>
+        <a href="./privacy.html" target="_blank" rel="noopener">Privacy</a>
+      </div>
+    </div>
+
+    <div id="screenshot-container">
+      <img id="screenshot" src="./images/screenshot.png" width="800" alt="Wavacity screenshot">
+      <div id="progress-container">
+        <div id="progress-text">Loading...</div>
+        <div id="progress-bar">
+          <div id="progress-bar-position">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="splash-description" hidden>
+      <p>Wavacity is a port of the Audacity&reg; audio editor to the web browser.
+      It is free software released under the
+      <a href="#">GNU GPL v2</a>.  No install required.
+      </p>
+      <p>
+      You can download the original desktop software separately.
+      Wavacity is neither affiliated with nor endorsed by Audacity.
+      </p>
+    </div>
+    <div class="bold">&nbsp</div>
+  </div>
+
+  <div id="main-window"></div>
+  <div id="window-container"></div>
+  
+  <script>
+    var mainWindow = document.getElementById('main-window');
+    var statusElement = document.getElementById('progress-text');
+    var progressElement = document.getElementById('progress-bar-position');
+
+    var moduleBytesLoaded = 0;
+    var dataBytesLoaded = 0;
+    var totalDownloadSize = 0;
+
+    var showSplash = function (show) {
+      var element = document.getElementById('splash-screen');
+      element.style.display = show ? 'block' : 'none';
+    };
+
+    var updateProgress = function () {
+      if (totalDownloadSize > 0) {
+        var bytesLoaded = moduleBytesLoaded + dataBytesLoaded;
+        progressElement.style.width = 100 * bytesLoaded / totalDownloadSize + '%';
+        progressElement.hidden = false;
+      }
+    };
+
+    var updateModuleProgress = function (bytesLoaded, totalSize) {
+      moduleBytesLoaded = bytesLoaded;
+      totalDownloadSize = totalSize;
+      updateProgress();
+    };
+
+    var updateDataProgress = function (bytesLoaded) {
+      dataBytesLoaded = bytesLoaded;
+      updateProgress();
+    };
+
+    var setStatus = function (text) {
+      var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+      if (m) {
+        updateDataProgress(parseInt(m[2], 10));
+      } else {
+        statusElement.innerHTML = text;
+      }
+    };
+
+    var fetchWithProgress = async function (path, options) {
+      const response = await fetch(path, options);
+
+      if (typeof TransformStream !== 'undefined') {
+        var total;
+
+        const pathParts = path.split('.');
+        if (pathParts.length > 1) {
+          const length = parseInt(pathParts[pathParts.length - 2], 10);
+          if (!isNaN(length)) {
+            total = length;
+          }
+        }
+        if (!total) {
+          const length = response.headers.get("Content-Length");
+          total = parseInt(length, 10);
+        }
+
+        let bytesLoaded = 0;
+        const ts = new TransformStream({
+          transform (chunk, ctrl) {
+            bytesLoaded += chunk.byteLength;
+            setStatus('Loading...');
+            updateModuleProgress(bytesLoaded, total);
+            ctrl.enqueue(chunk)
+          }
+        });
+
+        return new Response(response.body.pipeThrough(ts), response);
+      } else {
+        return response;
+      }
+    };
+
+    var decodeQueryString = function (queryString) {
+      var output = {};
+
+      // stuff separated by =, separated by &
+      var re = /([^=&]+)(=([^&]*))?/g;
+      var match;
+      while (match = re.exec(queryString)) {
+        var key = decodeURIComponent(match[1].replace(/\+/g, ' '));
+        // skip parsing keys without values: 'key&k1=v1' -> {"k1": "v1"}
+        if (!match[2]) {
+          continue;
+        }
+        // if missing value = empty string: 'k1=&k2=' -> {"k1": "", "k2": ""}
+        var value = '';
+        if (match[3]) {
+          value = decodeURIComponent(match[3].replace(/\+/g, ' '));
+        }
+
+        output[key] = value;
+      }
+
+      return output;
+    };
+
+    var setModuleArgs = function () {
+      var args = [];
+
+      var queryParams = decodeQueryString(window.location.search.slice(1));
+      Module['queryParams'] = queryParams;
+
+      for (var key in queryParams) {
+        args.push('--' + key + '=' + queryParams[key]);
+      }
+
+      Module['arguments'] = args;
+      console.log('launched with args: ' + args);
+    };
+
+    var createCanvas = function () {
+      var canvas = document.createElement('canvas');
+      canvas.id = 'canvas';
+      canvas.style.display = 'none';
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      canvas.oncontextmenu = function () { event.preventDefault(); }
+
+      mainWindow.appendChild(canvas);
+
+      Module.canvas = canvas;
+    };
+
+    var onPreRun = function () {
+      setModuleArgs();
+      createCanvas();
+    };
+
+    var onRuntimeInitialized = function () {
+      showSplash(false);
+
+      var canvas = Module.canvas;
+      canvas.style.display = 'block';
+      //amplitude.getInstance().logEvent('run');
+    };
+
+    var Module = {
+      preRun: [onPreRun],
+      postRun: [],
+      print: function(text) {
+        if (arguments.length > 1) {
+          text = Array.prototype.slice.call(arguments).join(' ');
+        }
+        console.log(text);
+      },
+      printErr: function(text) {
+        if (arguments.length > 1) {
+          text = Array.prototype.slice.call(arguments).join(' ');
+        }
+        console.error(text);
+      },
+      setStatus: setStatus,
+      totalDependencies: 0,
+      onRuntimeInitialized: onRuntimeInitialized
+    };
+
+    if (typeof WebAssembly !== 'object' || typeof SharedArrayBuffer !== 'function') {
+      Module.setStatus('Unsupported browser: use desktop Chrome or Firefox');
+    } else {
+      showSplash(true);
+      Module.setStatus('Loading...');
+    }
+    window.onerror = function(message, file, line, column, error) {
+      console.log('Exception thrown: ' + message);
+      if (message == 'Script error.' && (!error || !error.stack)) {
+        return;
+      }
+      //amplitude.getInstance().logEvent('error');
+      var trace = error && error.stack ? message + '\n' + error.stack : message;
+      //sendCrashReport(null, trace, APP_NAME, APP_VERSION);
+    };
+  </script>
+  <script async type="text/javascript" src="wavacity_0.1.37_wasm32.js"></script>
+</body>
+</html>

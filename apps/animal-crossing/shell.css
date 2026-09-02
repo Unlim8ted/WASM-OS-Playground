@@ -1,0 +1,1184 @@
+/* Self-hosted webfonts. The .woff2 files live next to index.html after
+ * the build (copied via _PWA_FILES) and are pre-cached by sw.js so the
+ * PWA renders with correct typography offline. font-display:swap shows
+ * fallback text immediately while the woff2 streams. */
+@font-face {
+    font-family: "Work Sans";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("fonts/work-sans-400.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Work Sans";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("fonts/work-sans-500.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Work Sans";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("fonts/work-sans-600.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Fragment Mono";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("fonts/fragment-mono-400.woff2") format("woff2");
+}
+
+/* Compositor activity keepalive. Chromium on Snapdragon 8 Gen 3 +
+ * adaptive AMOLED phones (Z Flip 6, S24 family) classifies a wasm
+ * canvas-only page as "idle" between user inputs and applies
+ * intensive timer throttling — RAF and setTimeout get delayed
+ * by 50–200 ms, producing visible stutters on every press as the
+ * wasm waits longer than expected for its yield to return.
+ *
+ * A 1×1, fully transparent, GPU-composited transform animation
+ * is enough to keep the compositor's "page is animating" flag
+ * set, which keeps the panel at full refresh and timer dispatch
+ * tight. The animation runs entirely on the compositor thread
+ * (no main-thread cost) and is invisible to the user.
+ *
+ * Devices that didn't have the throttle problem pay only the
+ * negligible cost of one extra composited layer. */
+@keyframes _refresh-keepalive {
+    0%, 100% { opacity: 0.001; }
+    50%      { opacity: 0.002; }
+}
+body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 1px; height: 1px;
+    pointer-events: none;
+    background: #fff;
+    animation: _refresh-keepalive 1s linear infinite;
+    will-change: opacity;
+}
+/* Status colors used across rom picker, save slots, and settings menu. */
+:root {
+    --status-err: #f88;
+    --status-ok:  #6c0;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    color: #ddd;
+    font-family:
+        "Work Sans",
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Roboto",
+        "Helvetica Neue",
+        Arial,
+        sans-serif;
+    /* dvh/dvw track the *visible* viewport on mobile (account
+       for the URL bar / soft keyboard); 100vh/100% would resolve
+       to the layout viewport, which on Android Chrome can be
+       larger than what's actually visible — that's what was
+       pushing the canvas content under the URL bar. */
+    height: 100dvh;
+    width: 100dvw;
+    overflow: hidden;
+}
+#container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+}
+/* When the portrait touch overlay is active, bias the canvas toward
+   the top of the viewport so the bottom-anchored controls have
+   breathing room without fully detaching from the game image.
+   padding-bottom: 50dvh shifts the flex-centered child from the
+   50% line to the 25% line; in landscape (Layout B) controls sit
+   on the sides so we keep normal centering. */
+body.tc-bias-top #container {
+    /* padding-top clears the settings-gear / fullscreen-toggle buttons
+       (positioned fixed at top: 8 + safe-area-inset, 32×32) so the
+       canvas starts below them instead of being covered by their
+       upper-right corner overlay. */
+    padding-top: calc(48px + env(safe-area-inset-top));
+    padding-bottom: 50dvh;
+    box-sizing: border-box;
+}
+#canvas {
+    display: block;
+    background: #000;
+    outline: none;
+    image-rendering: pixelated;
+    width: 100%;
+    height: 100%;
+}
+/* Post-process overlay (shell-postfx.js — ASCII / CRT). Positioned
+   absolutely over #canvas; the JS keeps left/top/width/height in
+   sync with the game canvas's bounding rect each frame. Hidden by
+   default — the shader module flips display:block when the user
+   picks a non-off mode in the settings menu. */
+#postfx-overlay {
+    position: fixed;
+    display: none;
+    pointer-events: none;
+    image-rendering: pixelated;
+    z-index: 2;
+}
+/* Only when the viewport is narrower than 4:3 do we letterbox: pin
+   width to 100vw and derive height from the 4:3 aspect so the bottom
+   of the canvas leaves room for the touch overlay / URL bar instead
+   of squashing the image. Wider viewports keep the previous fill
+   behavior (canvas stretches to the container). */
+@media (max-aspect-ratio: 4/3) {
+    #canvas {
+        width: 100vw;
+        height: calc(100vw * 3 / 4);
+    }
+}
+#status {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    font-size: 12px;
+    opacity: 0.7;
+    pointer-events: none;
+}
+/* #build-tag now lives inside .menu-footer (settings dialog); see the
+   .menu-footer rule below for layout. Style is monospace + dim. */
+#build-tag {
+    font-family: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    opacity: 0.45;
+    user-select: text;
+}
+#progress {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: #4a9;
+    width: 0%;
+    transition: width 0.2s;
+}
+#rom-picker {
+    display: none;
+    position: fixed;
+    inset: 0;
+    /* Background: pre-decoded blurhash baked into a 6×6 SVG of
+       1×1 colored rects with a Gaussian-blur filter. SVG is
+       re-rasterized at the viewport size every paint, so it
+       scales cleanly to any DPR / window size with no stored
+       raster. The linear-gradient layer dims it so the
+       foreground text and inputs stay readable.
+       (Source blurhash: okG^6Du6K+rB…, see decoder script.) */
+    background:
+        linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
+        url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 6' preserveAspectRatio='xMidYMid slice'%3E%3Cfilter id='b' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeGaussianBlur stdDeviation='0.5'/%3E%3C/filter%3E%3Cg filter='url(%23b)'%3E%3Crect x='0' y='0' width='1' height='1' fill='%2399d8ff'/%3E%3Crect x='1' y='0' width='1' height='1' fill='%23a5e1ff'/%3E%3Crect x='2' y='0' width='1' height='1' fill='%2380c9fa'/%3E%3Crect x='3' y='0' width='1' height='1' fill='%239dc1ea'/%3E%3Crect x='4' y='0' width='1' height='1' fill='%2399bad7'/%3E%3Crect x='5' y='0' width='1' height='1' fill='%235db2dd'/%3E%3Crect x='0' y='1' width='1' height='1' fill='%23a0daf0'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23a1d5f4'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%23b7daf0'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%23bdc5d4'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%23ad9195'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%2397aab4'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%238bcdec'/%3E%3Crect x='1' y='2' width='1' height='1' fill='%2382ccf3'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23add4ed'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%23c8aab3'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23b56034'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%239a9ca0'/%3E%3Crect x='0' y='3' width='1' height='1' fill='%237dc9e7'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%238ad0f8'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%2385bfe1'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23a79ba3'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%23a18167'/%3E%3Crect x='5' y='3' width='1' height='1' fill='%23709aa0'/%3E%3Crect x='0' y='4' width='1' height='1' fill='%2391cadc'/%3E%3Crect x='1' y='4' width='1' height='1' fill='%239ed5fa'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%2398bdd4'/%3E%3Crect x='3' y='4' width='1' height='1' fill='%239f928d'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%23a47a5c'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%237a887d'/%3E%3Crect x='0' y='5' width='1' height='1' fill='%2388c6e2'/%3E%3Crect x='1' y='5' width='1' height='1' fill='%2385d0f4'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%237eb4c8'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%2391837f'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23907647'/%3E%3Crect x='5' y='5' width='1' height='1' fill='%23668774'/%3E%3C/g%3E%3C/svg%3E"),
+        #000;
+    background-size: cover;
+    background-position: center;
+    color: #ddd;
+    z-index: 10;
+    padding: 32px 24px;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 20px;
+}
+@media (max-width: 480px) {
+    #rom-picker { padding: 20px 14px; gap: 14px; }
+    #rom-instructions { padding-left: 16px; font-size: 13px; }
+    #rom-picker h1 { font-size: 18px; }
+}
+#rom-picker.visible { display: flex; }
+#rom-picker h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+}
+#rom-instructions {
+    max-width: 600px;
+    width: 100%;
+    line-height: 1.5;
+    font-size: 14px;
+    opacity: 0.85;
+    padding-left: 20px;
+    box-sizing: border-box;
+}
+#rom-instructions li { margin: 6px 0; }
+#webkit-warning {
+    max-width: 600px;
+    width: 100%;
+    line-height: 1.5;
+    font-size: 13px;
+    color: #f4d27a;
+    background: rgba(190, 100, 30, 0.18);
+    border: 1px solid rgba(244, 210, 122, 0.45);
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-sizing: border-box;
+}
+#webkit-warning a {
+    color: #ffe6a8;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+#webkit-warning strong { color: #ffd068; }
+#rom-instructions a {
+    color: #ddd;
+    text-decoration: underline;
+    text-decoration-color: rgba(255,255,255,0.35);
+    text-underline-offset: 2px;
+    transition: color 0.1s, text-decoration-color 0.1s;
+}
+#rom-instructions a:hover,
+#rom-instructions a:focus-visible {
+    color: #fff;
+    text-decoration-color: #ccc;
+}
+#rom-instructions a:visited { color: #ddd; }
+#rom-install-btn {
+    font: inherit;
+    color: #ddd;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.30);
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 0 2px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+}
+#rom-install-btn:hover,
+#rom-install-btn:focus-visible {
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.55);
+}
+#rom-drop {
+    /* Hidden until refreshRomStatus has resolved the ROM check;
+     * otherwise the drop zone briefly appears before we know
+     * whether a previously-imported ROM is available. */
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+    max-width: 600px;
+    min-height: 180px;
+    border: 2px dashed #888;
+    border-radius: 12px;
+    padding: 24px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    box-sizing: border-box;
+}
+#rom-drop:hover,
+#rom-drop.dragging {
+    background: rgba(255,255,255,0.08);
+    border-color: #ccc;
+}
+#rom-drop input { display: none; }
+#rom-drop .primary { font-size: 16px; margin-bottom: 4px; }
+#rom-drop .secondary { font-size: 12px; opacity: 0.65; }
+#rom-status,
+#rom-runtime-status {
+    min-height: 1.4em;
+    font-size: 13px;
+    opacity: 0.85;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+    max-width: 600px;
+}
+#rom-status.error,
+#rom-runtime-status.error { color: var(--status-err); opacity: 1; }
+#rom-status.ok,
+#rom-runtime-status.ok    { color: var(--status-ok); opacity: 1; }
+#rom-status .status-spinner,
+#rom-runtime-status .status-spinner {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+}
+#rom-saves {
+    width: 100%;
+    max-width: 600px;
+    border-top: 1px solid #222;
+    padding-top: 16px;
+}
+.rom-saves-heading {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #aaa;
+    margin-bottom: 4px;
+}
+.rom-saves-help {
+    font-size: 12px;
+    opacity: 0.65;
+    margin-bottom: 10px;
+}
+.rom-saves-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+@media (max-width: 480px) {
+    .rom-saves-grid { grid-template-columns: 1fr; gap: 16px; }
+}
+.rom-saves-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    border: 1px solid #222;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.02);
+}
+.rom-saves-slot-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ddd;
+}
+.rom-saves-slot-state {
+    font-size: 12px;
+    opacity: 0.7;
+    min-height: 1.4em;
+    word-break: break-all;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.rom-saves-slot-state .status-spinner {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+}
+.rom-saves-slot.has-data .rom-saves-slot-state {
+    opacity: 1;
+    color: var(--status-ok);
+    /* Two-line layout: "Town: <name>" on top, size+time below.
+     * Override the empty/loading state's horizontal flex so the
+     * detail line sits under the town line instead of beside it. */
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+.rom-saves-slot-state-info {
+    font-size: 11px;
+    opacity: 0.75;
+    color: #ddd;
+}
+.rom-saves-slot-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.rom-saves-btn {
+    flex: 1 1 auto;
+    padding: 6px 10px;
+    background: #1a1a1a;
+    color: #ddd;
+    border: 1px solid #888;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+}
+.rom-saves-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.08);
+    border-color: #ccc;
+}
+.rom-saves-btn-secondary {
+    border-color: #555;
+    flex: 0 1 auto;
+}
+.rom-saves-btn-secondary:hover:not(:disabled) {
+    background: rgba(255,90,90,0.08);
+    border-color: #c66;
+}
+.rom-saves-btn:disabled { opacity: 0.4; cursor: default; }
+.rom-saves-status {
+    min-height: 1.4em;
+    font-size: 13px;
+    opacity: 0.85;
+    margin-top: 8px;
+}
+#settings-menu .rom-saves-status {
+    /* Keep min-height collapsed so the :empty rule below can hide the
+     * element entirely when there's no message — but give a real
+     * margin-top once a message appears so it doesn't crowd the slot
+     * grid above it. */
+    min-height: 0;
+    margin-top: 12px;
+}
+#settings-install-section { margin-top: 24px; }
+#settings-menu .rom-saves-status:empty { display: none; }
+.rom-saves-status.error { color: var(--status-err); opacity: 1; }
+.rom-saves-status.ok    { color: var(--status-ok); opacity: 1; }
+
+#rom-start {
+    margin-top: 8px;
+    margin-bottom: 24px;
+    padding: 12px 24px;
+    background: #1a1a1a;
+    color: #ddd;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    min-width: 200px;
+    transition: background 0.1s, border-color 0.1s, opacity 0.1s;
+}
+#rom-start:hover:not(:disabled) {
+    background: rgba(255,255,255,0.1);
+    border-color: #ccc;
+}
+#rom-start:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    border-color: #444;
+}
+
+#loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 8;          /* below #rom-picker (10), above the canvas */
+    background: #000;
+    color: #ddd;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    pointer-events: none;
+}
+#loading-overlay.visible { display: flex; }
+#loading-overlay svg {
+    opacity: 0.85;
+}
+#settings-gear,
+#fullscreen-toggle,
+#audio-toggle,
+#tc-style-swap {
+    display: none;
+    position: fixed;
+    /* Add safe-area inset so the buttons clear iOS notch / Android
+     * cutout / status bar / gesture areas when the viewport is set
+     * to viewport-fit=cover. env() returns 0 on devices/browsers
+     * without insets, so the offsets degrade to plain 8 / 48 px. */
+    top: calc(8px + env(safe-area-inset-top));
+    z-index: 5;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.45);
+    color: #ddd;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+    align-items: center;
+    justify-content: center;
+}
+#settings-gear     { right: calc(8px   + env(safe-area-inset-right)); }
+#fullscreen-toggle { right: calc(48px  + env(safe-area-inset-right)); font-size: 16px; }
+#audio-toggle      { right: calc(88px  + env(safe-area-inset-right)); font-size: 16px; }
+#tc-style-swap     { right: calc(128px + env(safe-area-inset-right)); font-size: 16px; }
+#fullscreen-toggle .fs-icon-collapse { display: none; }
+#fullscreen-toggle.is-fullscreen .fs-icon-expand   { display: none; }
+#fullscreen-toggle.is-fullscreen .fs-icon-collapse { display: inline; }
+#audio-toggle .audio-icon-off { display: none; }
+#audio-toggle.is-muted .audio-icon-on  { display: none; }
+#audio-toggle.is-muted .audio-icon-off { display: inline; }
+#settings-gear:hover,
+#fullscreen-toggle:hover,
+#audio-toggle:hover,
+#tc-style-swap:hover {
+    opacity: 1;
+    background: rgba(0,0,0,0.7);
+    border-color: rgba(255,255,255,0.35);
+}
+#settings-menu {
+    color: #ddd;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 0;
+    max-width: 560px;
+    width: 90vw;
+    max-height: 90vh;
+    font-family: inherit;
+}
+/* Override the browser's default `dialog[open] { display: block }`
+ * so the menu uses flex column layout — keeps .menu-footer pinned
+ * to the bottom of the dialog while .menu-body scrolls. */
+#settings-menu[open] {
+    display: flex;
+    flex-direction: column;
+}
+#settings-menu::backdrop {
+    background: rgba(0,0,0,0.6);
+}
+#settings-menu .menu-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;          /* lets the body actually shrink so .menu-footer stays visible */
+}
+#settings-menu h2 {
+    margin: 0 0 16px;
+    font-size: 18px;
+    font-weight: 600;
+}
+#settings-menu h3 {
+    margin: 18px 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #aaa;
+}
+#settings-menu h3:first-of-type { margin-top: 0; }
+#settings-install-section .settings-install-help {
+    margin: 0 0 8px;
+    font-size: 13px;
+    opacity: 0.7;
+    line-height: 1.4;
+}
+#settings-install-btn {
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: inherit;
+    cursor: pointer;
+}
+#settings-install-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+#settings-menu .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+/* Form controls don't inherit font-family/size from their host by
+ * default, so left alone they render in the UA default (typically
+ * 16px in a system font) and stick out next to the rest of the
+ * menu's 13px Work Sans copy. Pull them back into the menu's type
+ * scale. */
+#settings-menu .row label,
+#settings-menu .row select,
+#settings-menu .row input {
+    font-family: inherit;
+    font-size: 13px;
+    color: inherit;
+}
+#settings-menu .row label { min-width: 90px; }
+#settings-menu .row select {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 4px 6px;
+    cursor: pointer;
+}
+#settings-menu .row input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 120px;
+}
+#settings-menu button.action {
+    flex: 1 1 auto;
+    min-width: 140px;
+    padding: 8px 12px;
+    background: #1a1a1a;
+    color: #ddd;
+    border: 1px solid #4a9;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+}
+#settings-menu button.action:hover:not(:disabled) {
+    background: rgba(74,153,89,0.12);
+    border-color: var(--status-ok);
+}
+#settings-menu button.action:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+#settings-menu .toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+}
+#settings-menu .toggle input { width: 16px; height: 16px; cursor: pointer; }
+#settings-menu .status {
+    font-size: 12px;
+    opacity: 0.75;
+    min-height: 1.2em;
+    margin-top: 4px;
+}
+#settings-menu .status.error { color: var(--status-err); opacity: 1; }
+#settings-menu .status.ok    { color: var(--status-ok); opacity: 1; }
+#settings-menu table.controls {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+#settings-menu table.controls th,
+#settings-menu table.controls td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid #222;
+}
+#settings-menu table.controls th {
+    color: #aaa;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+#settings-menu .menu-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* build-tag left, close button right */
+    padding: 12px 24px;
+    border-top: 1px solid #222;
+    flex: 0 0 auto;          /* pinned: never shrinks/scrolls with .menu-body */
+    background: #111;        /* opaque so scrolled body content doesn't bleed through */
+}
+#settings-menu .menu-footer button {
+    padding: 6px 14px;
+    background: #222;
+    color: #ddd;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+#settings-menu .menu-footer button:hover {
+    background: #2a2a2a;
+    border-color: #666;
+}
+
+/* ----- Touch gamepad overlay (mobile) ---------------------------
+   Hidden by default; the script below adds .visible when the user's
+   setting (auto / on / off) and device capability agree. Container
+   has pointer-events:none so empty space passes through to the
+   canvas; only individual controls opt into pointer-events:auto.
+   touch-action:none on the controls prevents the browser from
+   hijacking touches for scroll/zoom.
+   Opacity is driven by CSS variables so the settings slider can
+   change it at runtime without re-rendering. */
+#touch-controls {
+    --tc-bg-alpha:         0.18;
+    --tc-bg-pressed-alpha: 0.45;
+    --tc-stroke-alpha:     0.40;
+    --tc-label-alpha:      0.92;
+    /* Label/arrow base color — JS swaps this to a dark tone when the
+     * background opacity gets high enough that white-on-white-ish would
+     * be unreadable. Stored as an RGB triplet so the alpha can be
+     * applied separately by callers. */
+    --tc-label-rgb:        255, 255, 255;
+
+    /* Layout-shared positioning knobs. Both portrait (layout-a) and
+     * landscape (layout-b) full-mode use the same vertical anchor for
+     * the upper row and the same lower-row zone height. Per-layout
+     * rules below only override the values that genuinely differ
+     * (widths, dpad-cluster offset, face-button sizes). */
+    --tc-upper-bottom: 170px;   /* upper row bottom anchor */
+    --tc-cstick-h:     200px;   /* lower row zone height */
+    --tc-dpad-cell:     40px;   /* dpad-cluster grid cell size */
+
+    /* Face button sizes — defaults match layout-a; layout-b overrides
+     * via `#touch-controls.layout-b { --tc-face-a-size: ... }`. */
+    --tc-face-a-size: 70px;
+    --tc-face-b-size: 56px;
+    --tc-face-y-size: 50px;
+    --tc-face-x-size: 50px;
+    --tc-face-y-dy: 20px;       /* Y vertical nudge (slightly larger in layout-b) */
+
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    display: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+#touch-controls.visible { display: block; }
+#touch-controls .tc-button {
+    position: absolute;
+    pointer-events: auto;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+}
+#touch-controls .tc-button svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+#touch-controls .tc-bg {
+    fill: rgba(255, 255, 255, var(--tc-bg-alpha));
+    stroke: rgba(255, 255, 255, var(--tc-stroke-alpha));
+    stroke-width: 2;
+    transition: fill 0.05s;
+}
+#touch-controls .pressed .tc-bg {
+    fill: rgba(255, 255, 255, var(--tc-bg-pressed-alpha));
+}
+/* Per-button tints — pale GameCube-faceplate colors at the same alpha
+   variables as the default white. Higher specificity (#touch-controls
+   prefix) overrides the .pressed rule above so the tint persists when
+   pressed. */
+#touch-controls #tc-a .tc-bg          { fill: rgba(120, 230, 130, var(--tc-bg-alpha)); }
+#touch-controls #tc-a.pressed .tc-bg  { fill: rgba(120, 230, 130, var(--tc-bg-pressed-alpha)); }
+#touch-controls #tc-b .tc-bg          { fill: rgba(230, 110, 110, var(--tc-bg-alpha)); }
+#touch-controls #tc-b.pressed .tc-bg  { fill: rgba(230, 110, 110, var(--tc-bg-pressed-alpha)); }
+#touch-controls #tc-z .tc-bg          { fill: rgba(180, 130, 230, var(--tc-bg-alpha)); }
+#touch-controls #tc-z.pressed .tc-bg  { fill: rgba(180, 130, 230, var(--tc-bg-pressed-alpha)); }
+/* Fixed CSS-pixel size so labels don't scale with the SVG container —
+ * without this, font-size on the inline <text> attribute would
+ * scale with the viewBox / button-size ratio. */
+#touch-controls .tc-label {
+    font-size: 24px;
+    fill: rgba(var(--tc-label-rgb), var(--tc-label-alpha));
+    font-family: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 600;
+    text-anchor: middle;
+    dominant-baseline: central;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.4);
+    stroke-width: 1;
+}
+#touch-controls #tc-start .tc-label { font-size: 14px; }
+/* D-pad arrow triangles — match the letter buttons' visual size and
+   round the apex/base corners. Using solid white fill+stroke and an
+   element-level opacity means the stroke and fill blend internally as
+   one solid shape before the alpha is applied; rgba()-based alpha on
+   both would double-blend at the stroke seam, producing a visible
+   outline around the triangle. */
+#touch-controls .tc-arrow {
+    fill: rgb(var(--tc-label-rgb));
+    stroke: rgb(var(--tc-label-rgb));
+    stroke-width: 4;
+    stroke-linejoin: round;
+    opacity: var(--tc-label-alpha);
+}
+/* Stick zone: invisible touch area where nipplejs spawns the joystick.
+   Layout-A (default) covers bottom-left half; Layout-B (landscape)
+   covers most of the left edge. */
+#tc-stick-zone {
+    position: absolute;
+    pointer-events: auto;
+    touch-action: none;
+}
+/* nipplejs renders absolutely-positioned joystick visuals into the
+   zone; ensure they sit above the canvas but below the buttons.
+   Pure white was too harsh against the game image — soften to a
+   dim translucent white that visually matches the other controls. */
+#tc-stick-zone .nipple { z-index: 5; }
+#tc-stick-zone .nipple .back  { opacity: 0.55 !important; }
+#tc-stick-zone .nipple .front { opacity: 0.75 !important; }
+
+/* Hint shown in the stick zone while idle so users know it's
+   interactive. Fades out when nipplejs is active (managed by the
+   script via .stick-active on the parent overlay). Inherits the
+   same opacity variables as the other controls. */
+#tc-stick-hint {
+    position: absolute;
+    pointer-events: none;
+    width: 110px;
+    height: 110px;
+    /* Hint is a child of #tc-stick-zone — these percentages are
+       relative to the zone, so the hint auto-tracks whichever
+       layout/style the zone is in. Default is bottom-anchored at
+       the zone's horizontal center (low in the zone, near where the
+       thumb rests on a phone held in portrait). style-full overrides
+       to vertical center because its zone is much smaller. */
+    left: 50%;
+    bottom: 60px;
+    transform: translateX(-50%);
+    transition: opacity 0.15s ease;
+    opacity: 1;
+}
+#touch-controls.stick-active #tc-stick-hint { opacity: 0; }
+#tc-stick-hint .hint-bg {
+    fill: rgba(255, 255, 255, var(--tc-bg-alpha));
+    stroke: rgba(255, 255, 255, var(--tc-stroke-alpha));
+    stroke-width: 2;
+}
+#tc-stick-hint .hint-knob {
+    fill: rgba(255, 255, 255, calc(var(--tc-bg-alpha) + 0.15));
+}
+/* In simplified mode, align the stick hint vertically with the A face
+   button so the two thumb-rest anchors match.
+     Layout A: A button at bottom 90 + half-height 43 = center bottom 133
+               → hint bottom = 133 − 55 (half hint height) = 78
+     Layout B: A button at bottom 110 + 43 = center bottom 153
+               → hint bottom = 153 − 55 = 98
+   style-full overrides these (further down) to vertical-center the
+   hint inside the small full-mode stick zone. */
+#touch-controls.layout-a #tc-stick-hint { bottom: 78px; }
+#touch-controls.layout-b #tc-stick-hint { bottom: 98px; left: 100px; }
+
+/* ===== Simplified mode — face button sizes (layout-agnostic) =====
+   A/B/Y/X/Start sizes are identical between portrait and landscape;
+   only positions differ. The per-layout blocks below set right/bottom
+   anchors and inherit these sizes. D-pad is hidden in both layouts
+   (its uses — letter writing, pattern editor, item arrangement, NES
+   emulator — all benefit from a wider screen anyway; players who
+   need it rotate to Layout B and toggle to style-full). */
+#touch-controls.style-simplified #tc-a     { width: 86px; height: 86px; }
+#touch-controls.style-simplified #tc-b     { width: 70px; height: 70px; }
+#touch-controls.style-simplified #tc-y     { width: 64px; height: 64px; }
+#touch-controls.style-simplified #tc-x     { width: 64px; height: 64px; }
+#touch-controls.style-simplified #tc-start { width: 64px; height: 32px; }
+#touch-controls #tc-dpad { display: none; }
+
+/* ===== Layout A — portrait / default =====
+   Start is stacked above Y in the right cluster so it's reachable
+   by the right thumb instead of needing a stretch to the top. */
+#touch-controls.layout-a #tc-stick-zone { left: 0; bottom: 0; width: 50%; height: 60%; }
+#touch-controls.layout-a #tc-a     { right: 28px;  bottom: 90px;  }
+#touch-controls.layout-a #tc-b     { right: 110px; bottom: 38px;  }
+#touch-controls.layout-a #tc-y     { right: 100px; bottom: 152px; }
+#touch-controls.layout-a #tc-x     { right: 28px;  bottom: 176px; }
+#touch-controls.layout-a #tc-start { right: 70px;  bottom: 240px; }
+
+/* ===== Layout B — landscape / split ===== */
+#touch-controls.layout-b #tc-stick-zone { left: 0; top: 0; width: 40%; height: 100%; }
+#touch-controls.layout-b #tc-a     { right: 36px;  bottom: 110px; }
+#touch-controls.layout-b #tc-b     { right: 118px; bottom: 50px;  }
+#touch-controls.layout-b #tc-y     { right: 108px; bottom: 172px; }
+#touch-controls.layout-b #tc-x     { right: 36px;  bottom: 196px; }
+#touch-controls.layout-b #tc-start { right: 80px;  bottom: 260px; }
+
+/* ===== Style modifiers =====
+   .style-simplified (default) hides the GameCube-faceplate extras
+   (D-pad, X, Z, L, R, C-stick). .style-full shows them and applies
+   per-layout positions for the full set. The simplified-positioning
+   rules above stay in effect for A/B/Y/Start/main-stick — the full
+   variant only adds and where necessary repositions to make room.
+
+   Default-hidden so they don't flash at unstyled positions before
+   applyStyle() runs; .style-full revives them below. */
+#touch-controls #tc-z,
+#touch-controls #tc-l,
+#touch-controls #tc-r,
+#touch-controls #tc-dpad-up,
+#touch-controls #tc-dpad-down,
+#touch-controls #tc-dpad-left,
+#touch-controls #tc-dpad-right,
+#touch-controls #tc-cstick-zone { display: none; }
+#touch-controls.style-simplified #tc-dpad,
+#touch-controls.style-simplified #tc-z,
+#touch-controls.style-simplified #tc-l,
+#touch-controls.style-simplified #tc-r,
+#touch-controls.style-simplified #tc-dpad-up,
+#touch-controls.style-simplified #tc-dpad-down,
+#touch-controls.style-simplified #tc-dpad-left,
+#touch-controls.style-simplified #tc-dpad-right,
+#touch-controls.style-simplified #tc-cstick-zone { display: none; }
+
+/* In style-full the stick zones are much smaller (~200px), so the
+   simplified-mode "60px from zone bottom" rule would put the hint
+   near the bottom edge. Center vertically in the small zone instead. */
+#touch-controls.style-full #tc-stick-hint,
+#touch-controls.style-full #tc-cstick-hint {
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+}
+/* Horizontally align the main stick hint with the D-pad cluster's
+   center (the cluster sits directly below the stick zone, so this
+   keeps the thumb path consistent — user touches the same x-column
+   for both). D-pad center: cluster left + half cluster width.
+     Layout A: 40 + 60 = 100
+     Layout B: 14 + 60 = 74
+   The transform from the rule above (translate(-50%, -50%)) re-anchors
+   the hint's center on the new `left` value. */
+#touch-controls.layout-a.style-full #tc-stick-hint { left: 100px; }
+#touch-controls.layout-b.style-full #tc-stick-hint { left: 110px; top: 65%; }
+
+/* In style-full the D-pad cross is replaced by the 3×3 arrow grid
+   (#tc-dpad-cluster); reveal the cluster wrappers and shoulder row
+   buttons. Sizes for grid items come from the cluster's grid-template
+   below; sizes for shoulder buttons come from the layout-specific
+   rules below. */
+#touch-controls.style-full #tc-dpad { display: none; }
+#touch-controls.style-full #tc-x,
+#touch-controls.style-full #tc-z,
+#touch-controls.style-full #tc-l,
+#touch-controls.style-full #tc-r,
+#touch-controls.style-full #tc-dpad-up,
+#touch-controls.style-full #tc-dpad-down,
+#touch-controls.style-full #tc-dpad-left,
+#touch-controls.style-full #tc-dpad-right { display: block; }
+#touch-controls.style-full #tc-cstick-zone { display: block; }
+
+/* C-stick zone — twin of #tc-stick-zone but anchored on the opposite
+   side. nipplejs renders into it as a second floating analog stick. */
+#tc-cstick-zone {
+    position: absolute;
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#tc-cstick-hint {
+    position: absolute;
+    width: 110px;
+    height: 110px;
+    pointer-events: none;
+    /* Mirror of #tc-stick-hint. */
+    left: 50%;
+    bottom: 60px;
+    transform: translateX(-50%);
+    transition: opacity 0.15s ease;
+    opacity: 1;
+}
+#touch-controls.cstick-active #tc-cstick-hint { opacity: 0; }
+/* Yellow tint on the active C-stick nipplejs visuals. nipplejs sets
+   the back/front backgrounds via inline style from the JS `color`
+   option (see ensureCstickNipple in shell-touch.js); these CSS rules
+   override that with a translucent yellow so the dragging joystick
+   reads as the C-stick at a glance, matching the at-rest hint tint. */
+#tc-cstick-zone .nipple .back  { background: rgba(230, 220, 130, 0.55) !important; opacity: 1 !important; }
+#tc-cstick-zone .nipple .front { background: rgba(230, 220, 130, 0.85) !important; opacity: 1 !important; }
+#tc-cstick-hint .hint-bg {
+    fill: rgba(230, 220, 130, var(--tc-bg-alpha));
+    stroke: rgba(230, 220, 130, var(--tc-stroke-alpha));
+    stroke-width: 2;
+}
+#tc-cstick-hint .hint-knob {
+    fill: rgba(230, 220, 130, calc(var(--tc-bg-alpha) + 0.15));
+}
+/* Override .tc-label inside the C-stick hint:
+     - The hint SVG renders into a 110×110 box (vs the face buttons' ~56),
+       so the 24-unit font-size scales up to ~26 CSS px — much larger
+       than the ~13 px on B. Drop to 12 to roughly match B's letter.
+     - Drop the dark stroke that .tc-label adds for outline contrast —
+       at this scale the stroke reads as a halo around the C, not a
+       letter accent. */
+#tc-cstick-hint .tc-label {
+    font-size: 12px;
+    stroke: none;
+}
+/* "C" label centered on the active nipplejs thumb (the .front element
+   nipplejs injects when the user touches the C-stick zone). The hint
+   gets its own "C" via SVG <text>; this rule covers the dragging
+   joystick visual. nipplejs's .front is positioned absolutely and
+   moves with the touch, so the pseudo-element rides along. */
+#tc-cstick-zone .nipple .front {
+    position: relative; /* needed for ::after positioning context */
+}
+#tc-cstick-zone .nipple .front::after {
+    content: 'C';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    pointer-events: none;
+}
+
+/* ===== Cluster/row wrappers =====
+   The D-pad arrows, face buttons, and shoulder row are wrapped in
+   container divs in shell.html. Outside style-full those wrappers
+   are `display: contents` (boxes vanish from the layout tree, so
+   the children behave as direct siblings of #touch-controls and the
+   simplified-mode absolute-position rules above keep working). In
+   style-full the wrappers become grid/flex containers and the
+   children get placed by grid-area / flex-distribution instead. */
+#tc-dpad-cluster,
+#tc-face-cluster,
+#tc-shoulder-row { display: contents; }
+
+/* In style-full, individual buttons inside a cluster are flow items
+   (not absolute) — clear the .tc-button position so the grid/flex
+   parent owns the layout. */
+#touch-controls.style-full #tc-dpad-cluster > .tc-button,
+#touch-controls.style-full #tc-face-cluster > .tc-button {
+    position: static;
+}
+/* D-pad arrows are uniform; fill their grid cells exactly. */
+#touch-controls.style-full #tc-dpad-cluster > .tc-button {
+    width: 100%;
+    height: 100%;
+}
+/* Face buttons are intentionally non-uniform (A is the dominant button,
+   B/Y/X smaller). Sizes are set per-button below; cells are sized to
+   match in the layout-a/-b grid-template rules. align/justify-self
+   handle the cases where a button's intrinsic size is smaller than
+   its cell (e.g. X in the X-row cell that's sized to A's row). */
+#touch-controls.style-full #tc-face-cluster > .tc-button {
+    align-self: center;
+    justify-self: center;
+}
+
+/* ----- D-pad cluster (style-full, both layouts) -----
+   3×3 grid; arrows fill the cardinal cells. Cell size differs per
+   layout (50px portrait, 44px landscape) — total cluster size scales
+   with cell size, so anchoring on left/bottom alone moves the whole
+   cross. */
+#touch-controls.style-full #tc-dpad-cluster {
+    display: grid;
+    position: absolute;
+    pointer-events: none;
+}
+#touch-controls.style-full #tc-dpad-cluster > .tc-button { pointer-events: auto; }
+#touch-controls.style-full #tc-dpad-cluster #tc-dpad-up    { grid-column: 2; grid-row: 1; }
+#touch-controls.style-full #tc-dpad-cluster #tc-dpad-left  { grid-column: 1; grid-row: 2; }
+#touch-controls.style-full #tc-dpad-cluster #tc-dpad-right { grid-column: 3; grid-row: 2; }
+#touch-controls.style-full #tc-dpad-cluster #tc-dpad-down  { grid-column: 2; grid-row: 3; }
+
+/* ----- Face cluster (style-full, both layouts) -----
+   4-row × 2-col stair-step matching the original asymmetric layout:
+   X top-right, Y mid-upper-left, A mid-lower-right (the dominant
+   button), B bottom-left. Each button gets its own row so they
+   stagger diagonally instead of pairing into the same row. The
+   per-layout rules below set the row/column sizes (and therefore
+   each button's cell size); per-button width/height makes A larger
+   than the others. */
+#touch-controls.style-full #tc-face-cluster {
+    display: grid;
+    position: absolute;
+    pointer-events: none;
+    grid-template-areas:
+        ".  X"
+        "Y  ."
+        ".  A"
+        "B  .";
+}
+#touch-controls.style-full #tc-face-cluster > .tc-button { pointer-events: auto; }
+#touch-controls.style-full #tc-face-cluster #tc-x { grid-area: X; }
+#touch-controls.style-full #tc-face-cluster #tc-y { grid-area: Y; }
+#touch-controls.style-full #tc-face-cluster #tc-a { grid-area: A; }
+#touch-controls.style-full #tc-face-cluster #tc-b { grid-area: B; }
+
+/* ----- Style-full shared rules (apply to both layouts) =====
+   Anchor and sizing tokens shared between layout-a and layout-b live
+   on `#touch-controls` as custom properties. Per-layout blocks below
+   only set what genuinely differs — primarily horizontal positioning
+   (widths, side anchors), the dpad-cluster's bottom offset, and the
+   shoulder-row arrangement. */
+
+/* Lower row: cstick height + dpad grid sizing identical across layouts. */
+#touch-controls.style-full #tc-cstick-zone  { right: 0; bottom: 0; top: auto; height: var(--tc-cstick-h); }
+#touch-controls.style-full #tc-dpad-cluster { left: auto; right: auto; top: auto;
+    grid-template-columns: var(--tc-dpad-cell) var(--tc-dpad-cell) var(--tc-dpad-cell);
+    grid-template-rows:    var(--tc-dpad-cell) var(--tc-dpad-cell) var(--tc-dpad-cell); }
+
+/* Face cluster shape — column widths and row heights track the per-
+ * layout button sizes via custom properties. The X+Y stack is bottom-
+ * aligned so it packs against A's top edge; B floats up via translate
+ * to clear A. */
+#touch-controls.style-full #tc-face-cluster {
+    bottom: var(--tc-upper-bottom);
+    top: auto;
+    grid-template-columns: var(--tc-face-b-size) var(--tc-face-a-size);
+    grid-template-rows:    18px 18px var(--tc-face-a-size) var(--tc-face-b-size);
+}
+#touch-controls.style-full #tc-face-cluster #tc-a { width: var(--tc-face-a-size); height: var(--tc-face-a-size); }
+#touch-controls.style-full #tc-face-cluster #tc-b { width: var(--tc-face-b-size); height: var(--tc-face-b-size); transform: translateY(-30px); }
+#touch-controls.style-full #tc-face-cluster #tc-y { width: var(--tc-face-y-size); height: var(--tc-face-y-size); align-self: end; transform: translateY(var(--tc-face-y-dy)); }
+#touch-controls.style-full #tc-face-cluster #tc-x { width: var(--tc-face-x-size); height: var(--tc-face-x-size); align-self: end; justify-self: start; transform: translate(8px, 10px); }
+
+/* Shoulder buttons share their sizes across layouts; only positioning
+ * differs (flex bar in portrait, absolute top-edge row in landscape). */
+#touch-controls.style-full #tc-l     { width: 52px; height: 28px; }
+#touch-controls.style-full #tc-r     { width: 52px; height: 28px; }
+#touch-controls.style-full #tc-z     { width: 44px; height: 28px; }
+#touch-controls.style-full #tc-start { width: 56px; height: 28px; }
+
+/* ----- Layout A (portrait) — full set =====
+   D-pad cluster lower-left, stick zone above; face cluster upper-
+   right, c-stick lower-right (mirror). Shoulder row is a flex bar
+   pinned just above the cluster region so L/Start/Z/R distribute
+   evenly across the screen width.
+   Upper row sits just above the visible top of the lower row (cstick
+   hint top ≈ 155 px from viewport bottom; dpad-cluster top ≈ 148 px)
+   with a small margin, so the layout always packs the upper row
+   directly above the lower row no matter how tall the viewport gets —
+   keeps the controls in thumb reach on iPads. */
+#touch-controls.layout-a.style-full #tc-stick-zone     { left: 0;     bottom: var(--tc-upper-bottom); width: 45%; height: var(--tc-cstick-h); }
+#touch-controls.layout-a.style-full #tc-cstick-zone    { width: 45%; }
+#touch-controls.layout-a.style-full #tc-dpad-cluster   { left: 40px; bottom: 28px; }
+#touch-controls.layout-a.style-full #tc-face-cluster   { right: 14px; }
+#touch-controls.layout-a.style-full #tc-shoulder-row {
+    display: flex;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 410px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+#touch-controls.layout-a.style-full #tc-shoulder-row > .tc-button {
+    position: static;
+    pointer-events: auto;
+}
+
+/* ----- Layout B (landscape) — full set =====
+   Layout (~800×400 viewport):
+     - upper-left   : main stick zone
+     - lower-left   : D-pad cluster (below stick)
+     - upper-right  : face cluster A/B/X/Y
+     - lower-right  : C-stick zone (below face)
+     - top edge     : L, Start, Z, R
+   This mirrors the portrait-mode arrangement (stick above d-pad on
+   the left; face above c-stick on the right) so the thumb path is
+   the same in both orientations. */
+#touch-controls.layout-b { --tc-face-a-size: 76px; --tc-face-b-size: 60px; --tc-face-y-size: 56px; --tc-face-y-dy: 22px; }
+#touch-controls.layout-b.style-full #tc-stick-zone   { left: 0;     bottom: var(--tc-upper-bottom); top: auto; width: 30%; height: 280px; }
+#touch-controls.layout-b.style-full #tc-cstick-zone  { width: 25%; }
+#touch-controls.layout-b.style-full #tc-dpad-cluster { left: 100px; bottom: 40px; }
+#touch-controls.layout-b.style-full #tc-face-cluster { right: 30px; }
+/* Top-edge shoulder row. L sits between the stick zone (left 0–30%)
+   and Start; R and Z are pulled inward from the right edge so they
+   don't cover the settings-gear / fullscreen-toggle buttons. */
+#touch-controls.layout-b.style-full #tc-l     { left: 240px;  top: 14px; bottom: auto; right: auto; }
+#touch-controls.layout-b.style-full #tc-r     { right: 240px; top: 14px; bottom: auto; left: auto; }
+#touch-controls.layout-b.style-full #tc-z     { right: 300px; top: 14px; bottom: auto; left: auto; }
+#touch-controls.layout-b.style-full #tc-start { left: 50%;    top: 14px; bottom: auto; right: auto; transform: translateX(-50%); }
