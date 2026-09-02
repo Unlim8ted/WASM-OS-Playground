@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+
+<head>
+    <base href="https://cdn.jsdelivr.net/gh/web-ports/celeste@4f043a5ce121b74dc54ce56d74f213a2eeea6b4e/">
+    <title>Celeste</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="icon" type="image/x-icon" href="assets/app.ico" />
+    <link rel="prefetch" id="mountainsrc" href="assets/mountain.png">
+    <link rel="stylesheet" href="styles.css" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Inter+Tight:ital,wght@0,100..900;1,100..900&family=Inter:wght@100..900&family=Material+Symbols+Rounded&display=swap"
+        rel="stylesheet" />
+
+    <script src="cfg.js"></script>
+    <script src="data.js"></script>
+    <script type="module" src="bundle.js"></script>
+</head>
+
+<body>
+    <div id="loading-screen" class="celeste-loading">
+        <div class="snowfield"></div>
+        <div class="peak"></div>
+        <div class="strawberry">●</div>
+        <div class="load-copy">
+            <div class="load-title">Celeste</div>
+            <div id="loading-textt" class="load-status">Climbing the mountain...</div>
+        </div>
+    </div>
+    <style>
+        .celeste-loading{position:fixed;inset:0;z-index:999999;overflow:hidden;background:linear-gradient(#87c7e9 0%,#f6c0c9 52%,#22172d 100%);font-family:Inter,Tahoma,sans-serif;color:white;display:grid;place-items:center}
+        .snowfield,.snowfield:before,.snowfield:after{position:absolute;inset:-20%;content:"";background-image:radial-gradient(#fff 1px,transparent 1px);background-size:38px 38px;animation:snow 9s linear infinite;opacity:.75}
+        .snowfield:before{transform:scale(1.4);animation-duration:14s;opacity:.45}
+        .snowfield:after{transform:scale(.75);animation-duration:6s;opacity:.6}
+        .peak{position:absolute;bottom:-12vh;width:78vmin;height:55vmin;background:linear-gradient(135deg,#efe9ff,#6f82bd 48%,#292345 49%);clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 -18px 44px rgba(255,255,255,.25))}
+        .strawberry{position:absolute;top:28%;left:50%;font-size:38px;color:#ef3340;text-shadow:0 0 18px #fff;animation:berry 1.2s ease-in-out infinite}
+        .load-copy{position:relative;text-align:center;text-shadow:0 3px 18px rgba(0,0,0,.4)}
+        .load-title{font-size:clamp(42px,8vw,96px);font-weight:900}
+        .load-status{margin-top:12px;font-size:18px;font-weight:700}
+        @keyframes snow{to{transform:translate3d(90px,160px,0)}}
+        @keyframes berry{50%{transform:translateY(-18px) scale(1.12)}}
+    </style>
+    <script>
+        Object.defineProperty(window, "alert", { value: function (message) {
+            const status = document.getElementById("loading-textt");
+            if (status) status.textContent = String(message || "Something went wrong.");
+            console.error(message);
+        } });
+    </script>
+</body>
+
+</html>
