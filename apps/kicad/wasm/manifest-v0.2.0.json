@@ -1,0 +1,45 @@
+{
+  "schema": 2,
+  "tag": "v0.2.0",
+  "builtAt": "2026-09-01T09:00:49.571Z",
+  "tools": {
+    "kicad_editor": "v0.2.0",
+    "pl_editor": "v0.2.0",
+    "gerbview": "v0.2.0",
+    "calculator": "v0.2.0",
+    "occ_service": "v0.2.0",
+    "ngspice_service": "v0.2.0"
+  },
+  "sizes": {
+    "kicad_editor": {
+      "wasm": 60791987,
+      "wasmStored": 10676397,
+      "totalStored": 16172187
+    },
+    "pl_editor": {
+      "wasm": 24905011,
+      "wasmStored": 4806037,
+      "totalStored": 10292653
+    },
+    "gerbview": {
+      "wasm": 23684117,
+      "wasmStored": 4554207,
+      "totalStored": 10040723
+    },
+    "calculator": {
+      "wasm": 13561790,
+      "wasmStored": 2559445,
+      "totalStored": 8031884
+    },
+    "occ_service": {
+      "wasm": 59403752,
+      "wasmStored": 12802285,
+      "totalStored": 12858153
+    },
+    "ngspice_service": {
+      "wasm": 5666939,
+      "wasmStored": 1282130,
+      "totalStored": 1309619
+    }
+  }
+}

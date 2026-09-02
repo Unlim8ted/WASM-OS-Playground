@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KiCad WASM — local</title>
+  <style>
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#202020; color:#eee; font:14px system-ui,sans-serif; }
+    #status { position:fixed; z-index:999999; left:10px; bottom:10px; padding:7px 10px; background:#000c; border-radius:6px; }
+    #launcher { position:fixed; z-index:1000000; inset:0; display:flex; align-items:center; justify-content:center; background:#171717; }
+    #launcher .box { padding:28px; border:1px solid #555; border-radius:12px; background:#242424; text-align:center; }
+    #launcher button { font:inherit; font-size:16px; margin:8px; padding:12px 18px; cursor:pointer; }
+    #main-window { position:absolute; inset:0; width:100vw; height:100vh; overflow:hidden; }
+    #window-container { position:absolute; inset:0; width:100vw; height:100vh; pointer-events:none; }
+    #canvas { display:block; position:absolute; left:0; top:0; touch-action:none; }
+  </style>
+</head>
+<body>
+  <div id="launcher">
+    <div class="box">
+      <h2>KiCad WebAssembly</h2>
+      <p>Same <code>kicad_editor.wasm</code>, different executable name.</p>
+      <button onclick="location.search='?tool=pcbnew'">PCB Editor</button>
+      <button onclick="location.search='?tool=eeschema'">Schematic Editor</button>
+      <button onclick="location.search='?tool=symbol_editor'">Symbol Editor</button>
+      <button onclick="location.search='?tool=footprint_editor'">Footprint Editor</button>
+    </div>
+  </div>
+
+  <!-- wx.js requires these exact host elements. Window id 0 maps to
+       #main-window; secondary wx windows are appended to #window-container. -->
+  <div id="main-window">
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+  </div>
+  <div id="window-container"></div>
+  <div id="status">Loading KiCad…</div>
+
+  <script>
+  (async () => {
+    const BASE = "./wasm/kicad_editor/v0.2.0";
+    const params = new URLSearchParams(location.search);
+    const tool = params.get("tool");
+    const programs = {
+      pcbnew: "/usr/bin/pcbnew",
+      eeschema: "/usr/bin/eeschema",
+      symbol_editor: "/usr/bin/symbol_editor",
+      footprint_editor: "/usr/bin/footprint_editor"
+    };
+
+    // PCBJam passes BOTH argv[0] (thisProgram) and a --frame selector.
+    // The --frame value is what selects the actual editor frame inside
+    // the shared kicad_editor.wasm build.
+    const frames = {
+      pcbnew: "pcb",
+      eeschema: "sch",
+      symbol_editor: "symedit",
+      footprint_editor: "fpedit"
+    };
+    if (!programs[tool]) {
+      document.getElementById("status").style.display = "none";
+      return;
+    }
+    document.getElementById("launcher").style.display = "none";
+
+    const status = document.getElementById("status");
+    const canvas = document.getElementById("canvas");
+
+    // wxWidgets/KiCad's Emscripten glue references `mainWindow` as a global
+    // JavaScript variable, not merely the #main-window DOM id.
+    window.mainWindow = document.getElementById("main-window");
+    var mainWindow = window.mainWindow;
+
+    // Performance mode: wx.js doubles the backing-store dimensions whenever
+    // devicePixelRatio >= 1.5. KiCad's software-painted crosshair then repaints
+    // ~4x as many pixels on every mouse move. Force wx's display scale to 1.
+    // This trades a little HiDPI sharpness for much lower pointer latency.
+    try {
+      Object.defineProperty(window, "devicePixelRatio", {
+        configurable: true,
+        get: () => 1
+      });
+    } catch (_) {}
+
+    // Avoid browser gestures/selection interfering with KiCad pointer ingress.
+    canvas.style.touchAction = "none";
+    canvas.style.userSelect = "none";
+    const say = s => { status.textContent = s || ""; console.log("[kicad]", s); };
+
+    // PCBJam writes this archive into KiCad's compiled-in resources directory.
+    let images = null;
+    try {
+      say("Downloading KiCad resources…");
+      const r = await fetch(BASE + "/images.tar.gz");
+      if (!r.ok) throw new Error("images.tar.gz HTTP " + r.status);
+      images = new Uint8Array(await r.arrayBuffer());
+    } catch (e) {
+      console.warn(e);
+    }
+
+    // kicad_editor.js reads this global Module object.
+    window.Module = {
+      // Shared WASM binary. PCBJam selects the requested editor with
+      // thisProgram plus --frame=<pcb|sch|symedit|fpedit>.
+      thisProgram: programs[tool],
+      arguments: [`--frame=${frames[tool]}`],
+      canvas,
+      ENV: {},
+      locateFile: path => BASE + "/" + path,
+      preRun: [
+        () => {
+          // Match the setup used by the PCBJam frontend.
+          try {
+            FS.mkdirTree("/workspace/build-wasm/sysroot/share/kicad/resources");
+            if (images) {
+              FS.writeFile("/workspace/build-wasm/sysroot/share/kicad/resources/images.tar.gz", images);
+            }
+            FS.mkdirTree("/home/kicad/.config/kicad/kicad/10.0");
+            FS.mkdirTree("/mnt/pcbjam");
+            FS.mkdirTree("/pcbjam/3dmodels");
+          } catch (e) {
+            console.warn("preRun setup:", e);
+          }
+        }
+      ],
+      print: (...x) => console.log(...x),
+      printErr: (...x) => console.warn(...x),
+      setStatus: say,
+      onAbort: x => say("KiCad aborted: " + x),
+      onRuntimeInitialized: () => {
+        say("KiCad runtime initialized");
+        setTimeout(() => { status.style.display = "none"; }, 1500);
+      }
+    };
+
+    function script(src) {
+      return new Promise((resolve,reject) => {
+        const s=document.createElement("script");
+        s.src=src; s.onload=resolve; s.onerror=()=>reject(new Error("Failed to load "+src));
+        document.head.appendChild(s);
+      });
+    }
+
+    try {
+      await script(BASE + "/wx.js");
+      await script(BASE + "/wx-dom.js");
+      say("Loading PCB Editor WebAssembly…");
+      await script(BASE + "/kicad_editor.js");
+    } catch (e) {
+      console.error(e);
+      say("Startup error — open DevTools Console");
+    }
+  })();
+  </script>
+</body>
+</html>
