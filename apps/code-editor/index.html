@@ -1,0 +1,1477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Code</title>
+<style>
+:root {
+    --bg:#0d0f12;
+    --panel:#12151a;
+    --panel2:#171a20;
+    --panel3:#1d2128;
+    --border:#282d36;
+    --soft:#20242c;
+    --text:#e7eaf0;
+    --muted:#9099a8;
+    --dim:#5f6876;
+    --accent:#7c9cff;
+    --accent-soft:rgba(124,156,255,.13);
+    --good:#62d6a7;
+    --bad:#ff737d;
+    --sidebar:250px;
+    --terminal:230px;
+}
+*{box-sizing:border-box}
+html,body{
+    width:100%;
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    background:var(--bg);
+    color:var(--text);
+    font:13px Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+button,input,textarea{font:inherit}
+button{color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{
+    outline:1px solid var(--accent);
+    outline-offset:-1px;
+}
+.app{
+    width:100%;
+    height:100%;
+    display:grid;
+    grid-template:
+        "top top" 42px
+        "side main" minmax(0,1fr)
+        "side terminal" var(--terminal)
+        "status status" 24px
+        / var(--sidebar) minmax(0,1fr);
+}
+.top{
+    grid-area:top;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:0 10px;
+    background:var(--panel);
+    border-bottom:1px solid var(--border);
+}
+.brand{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width:130px;
+    font-weight:650;
+}
+.logo{
+    width:21px;
+    height:21px;
+    display:grid;
+    place-items:center;
+    border-radius:5px;
+    background:var(--accent);
+    color:#08101e;
+    font:900 11px monospace;
+}
+.pathbox{
+    flex:1;
+    max-width:720px;
+    height:28px;
+    display:flex;
+    align-items:center;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:var(--bg);
+}
+.pathbox span{
+    padding-left:9px;
+    color:var(--dim);
+}
+.pathbox input{
+    flex:1;
+    min-width:0;
+    height:100%;
+    border:0;
+    outline:0;
+    padding:0 9px;
+    background:transparent;
+    color:var(--text);
+}
+.actions{
+    margin-left:auto;
+    display:flex;
+    gap:4px;
+}
+.btn{
+    height:28px;
+    min-width:28px;
+    border:1px solid transparent;
+    border-radius:6px;
+    padding:0 9px;
+    background:transparent;
+    color:var(--muted);
+}
+.btn:hover{
+    background:var(--panel3);
+    color:var(--text);
+}
+.btn.primary{
+    background:var(--accent);
+    color:#08101e;
+    font-weight:700;
+}
+.sidebar{
+    grid-area:side;
+    min-width:0;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    background:var(--panel);
+    border-right:1px solid var(--border);
+}
+.sidehead{
+    height:38px;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    padding:0 8px 0 13px;
+    border-bottom:1px solid var(--soft);
+}
+.sidetitle{
+    color:var(--muted);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.08em;
+}
+.sidebuttons{
+    margin-left:auto;
+    display:flex;
+    gap:1px;
+}
+.files{
+    flex:1;
+    overflow:auto;
+    padding:5px 0;
+}
+.file{
+    height:29px;
+    padding:0 10px 0 12px;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    overflow:hidden;
+    border-left:2px solid transparent;
+    color:#cbd0da;
+    cursor:default;
+}
+.file:hover{background:var(--panel2)}
+.file.selected{
+    background:var(--accent-soft);
+    border-left-color:var(--accent);
+    color:white;
+}
+.file-icon{
+    width:18px;
+    flex:0 0 18px;
+    text-align:center;
+    color:var(--muted);
+    font-size:11px;
+}
+.file.dir .file-icon{color:#e6bd72}
+.file-name{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.empty{
+    padding:18px 14px;
+    color:var(--dim);
+    line-height:1.6;
+}
+.main{
+    grid-area:main;
+    min-width:0;
+    min-height:0;
+    display:grid;
+    grid-template-rows:35px 29px minmax(0,1fr);
+}
+.tabs{
+    min-width:0;
+    display:flex;
+    overflow-x:auto;
+    overflow-y:hidden;
+    background:var(--panel);
+    border-bottom:1px solid var(--border);
+}
+.tabs::-webkit-scrollbar{height:0}
+.tab{
+    height:35px;
+    min-width:120px;
+    max-width:220px;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:0 8px 0 11px;
+    border-top:2px solid transparent;
+    border-right:1px solid var(--border);
+    color:var(--muted);
+}
+.tab.active{
+    background:var(--bg);
+    border-top-color:var(--accent);
+    color:var(--text);
+}
+.tab-name{
+    flex:1;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.dirty{
+    width:7px;
+    height:7px;
+    flex:0 0 7px;
+    border-radius:50%;
+    background:var(--accent);
+}
+.close{
+    width:18px;
+    height:18px;
+    padding:0;
+    border:0;
+    border-radius:4px;
+    background:transparent;
+    color:var(--dim);
+}
+.close:hover{
+    background:var(--panel3);
+    color:white;
+}
+.breadcrumb{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    min-width:0;
+    padding:0 13px;
+    overflow:hidden;
+    white-space:nowrap;
+    border-bottom:1px solid var(--soft);
+    color:var(--muted);
+    font-size:12px;
+}
+.sep{color:var(--dim)}
+.editorwrap{
+    min-width:0;
+    min-height:0;
+    position:relative;
+}
+.code{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    resize:none;
+    border:0;
+    outline:0;
+    padding:15px 18px;
+    background:var(--bg);
+    color:#dce1ea;
+    tab-size:4;
+    white-space:pre;
+    overflow:auto;
+    font:13px/1.6 "SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+}
+.welcome{
+    position:absolute;
+    inset:0;
+    display:grid;
+    place-items:center;
+    pointer-events:none;
+}
+.welcome div{
+    width:min(430px,80%);
+    color:var(--muted);
+    line-height:1.7;
+}
+.welcome h1{
+    margin:0 0 7px;
+    color:var(--text);
+    font-size:22px;
+    font-weight:600;
+}
+.welcome p{margin:0}
+.terminal{
+    grid-area:terminal;
+    min-width:0;
+    min-height:0;
+    display:grid;
+    grid-template-rows:34px minmax(0,1fr) 34px;
+    background:#090b0e;
+    border-top:1px solid var(--border);
+}
+.termhead{
+    display:flex;
+    align-items:center;
+    padding:0 9px 0 12px;
+    background:var(--panel);
+    border-bottom:1px solid var(--soft);
+}
+.termtitle{
+    color:var(--muted);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.07em;
+}
+.termactions{
+    margin-left:auto;
+}
+.output{
+    margin:0;
+    padding:10px 13px;
+    overflow:auto;
+    white-space:pre-wrap;
+    word-break:break-word;
+    color:#cbd2dc;
+    font:12px/1.55 "SFMono-Regular",Consolas,monospace;
+}
+.cmdrow{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    align-items:center;
+    border-top:1px solid var(--soft);
+}
+.prompt{
+    padding-left:13px;
+    color:var(--good);
+    font:600 12px monospace;
+}
+.command{
+    min-width:0;
+    height:100%;
+    border:0;
+    outline:0;
+    padding:0 9px;
+    background:transparent;
+    color:var(--text);
+    font:12px "SFMono-Regular",Consolas,monospace;
+}
+.run{
+    height:25px;
+    margin-right:8px;
+    padding:0 12px;
+    border:0;
+    border-radius:5px;
+    background:var(--accent);
+    color:#08101e;
+    font-size:11px;
+    font-weight:700;
+}
+.status{
+    grid-area:status;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:0 9px;
+    background:var(--panel2);
+    border-top:1px solid var(--border);
+    color:var(--muted);
+    font-size:11px;
+}
+.status .right{
+    margin-left:auto;
+    display:flex;
+    gap:14px;
+}
+.dot{
+    display:inline-block;
+    width:6px;
+    height:6px;
+    margin-right:5px;
+    border-radius:50%;
+    background:var(--good);
+}
+.modalback{
+    position:fixed;
+    inset:0;
+    z-index:100;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,.52);
+}
+.modalback.show{display:flex}
+.modal{
+    width:min(420px,calc(100vw - 30px));
+    border:1px solid var(--border);
+    border-radius:9px;
+    overflow:hidden;
+    background:var(--panel2);
+    box-shadow:0 20px 70px rgba(0,0,0,.55);
+}
+.modal h2{
+    margin:0;
+    padding:14px 15px 6px;
+    font-size:15px;
+}
+.modal p{
+    margin:0;
+    padding:0 15px 12px;
+    color:var(--muted);
+    line-height:1.5;
+}
+.modal input{
+    width:calc(100% - 30px);
+    height:34px;
+    margin:0 15px 14px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    outline:0;
+    padding:0 10px;
+    background:var(--bg);
+    color:var(--text);
+}
+.modalactions{
+    display:flex;
+    justify-content:flex-end;
+    gap:6px;
+    padding:10px 15px;
+    border-top:1px solid var(--soft);
+}
+.toast{
+    position:fixed;
+    right:14px;
+    bottom:36px;
+    z-index:200;
+    max-width:380px;
+    padding:9px 12px;
+    border:1px solid var(--border);
+    border-radius:7px;
+    background:var(--panel3);
+    box-shadow:0 8px 28px rgba(0,0,0,.35);
+    opacity:0;
+    transform:translateY(6px);
+    pointer-events:none;
+    transition:.15s;
+}
+.toast.show{
+    opacity:1;
+    transform:none;
+}
+.toast.error{color:#ffadb3}
+@media(max-width:650px){
+    :root{--sidebar:190px}
+    .brand span{display:none}
+    .brand{min-width:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+<header class="top">
+    <div class="brand">
+        <div class="logo">&gt;_</div>
+        <span>Code</span>
+    </div>
+
+    <div class="pathbox">
+        <span>⌕</span>
+        <input id="path" value="/home/user" aria-label="Current directory">
+    </div>
+
+    <div class="actions">
+        <button class="btn" id="refresh" title="Refresh">↻</button>
+        <button class="btn primary" id="save" title="Save (Ctrl+S)">Save</button>
+    </div>
+</header>
+
+<aside class="sidebar">
+    <div class="sidehead">
+        <div class="sidetitle">EXPLORER</div>
+
+        <div class="sidebuttons">
+            <button class="btn" id="newFile" title="New file">＋</button>
+            <button class="btn" id="newFolder" title="New folder">▣</button>
+            <button class="btn" id="up" title="Parent directory">↑</button>
+            <button class="btn" id="sideRefresh" title="Refresh">↻</button>
+        </div>
+    </div>
+
+    <div id="files" class="files"></div>
+</aside>
+
+<main class="main">
+    <div id="tabs" class="tabs"></div>
+
+    <div id="breadcrumb" class="breadcrumb">
+        No file open
+    </div>
+
+    <div class="editorwrap">
+        <textarea
+            id="code"
+            class="code"
+            spellcheck="false"
+            autocomplete="off"
+            autocapitalize="off"
+            disabled
+        ></textarea>
+
+        <div id="welcome" class="welcome">
+            <div>
+                <h1>Code</h1>
+                <p>
+                    Open a file from the explorer or create a new one.
+                    Press <b>Ctrl/Cmd + S</b> to save.
+                    The terminal runs commands through the system shell.
+                </p>
+            </div>
+        </div>
+    </div>
+</main>
+
+<section class="terminal" id="terminal">
+    <div class="termhead">
+        <span class="termtitle">TERMINAL</span>
+
+        <div class="termactions">
+            <button class="btn" id="clearTerminal">Clear</button>
+        </div>
+    </div>
+
+    <pre id="out" class="output"></pre>
+
+    <div class="cmdrow">
+        <span class="prompt">$</span>
+        <input
+            id="command"
+            class="command"
+            value="pwd"
+            autocomplete="off"
+            spellcheck="false"
+        >
+        <button id="run" class="run">Run</button>
+    </div>
+</section>
+
+<footer class="status">
+    <span>
+        <span class="dot"></span>
+        <span id="state">Ready</span>
+    </span>
+
+    <span id="fileStatus">No file selected</span>
+
+    <div class="right">
+        <span id="position">Ln 1, Col 1</span>
+        <span id="language">Plain Text</span>
+        <span>UTF-8</span>
+    </div>
+</footer>
+
+</div>
+
+<div id="modalback" class="modalback">
+    <div class="modal">
+        <h2 id="modalTitle">New file</h2>
+        <p id="modalText"></p>
+        <input id="modalInput" autocomplete="off" spellcheck="false">
+
+        <div class="modalactions">
+            <button class="btn" id="modalCancel">Cancel</button>
+            <button class="btn primary" id="modalOK">Create</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(() => {
+    const $ = id => document.getElementById(id);
+
+    const el = {
+        path: $('path'),
+        files: $('files'),
+        code: $('code'),
+        tabs: $('tabs'),
+        breadcrumb: $('breadcrumb'),
+        welcome: $('welcome'),
+        state: $('state'),
+        fileStatus: $('fileStatus'),
+        position: $('position'),
+        language: $('language'),
+        command: $('command'),
+        output: $('out'),
+        modalback: $('modalback'),
+        modalTitle: $('modalTitle'),
+        modalText: $('modalText'),
+        modalInput: $('modalInput'),
+        modalOK: $('modalOK'),
+        toast: $('toast')
+    };
+
+    let seq = 0;
+    let currentFile = '';
+    let commandHistory = [];
+    let historyIndex = 0;
+    let modalResolver = null;
+    let modalMode = 'prompt';
+
+    const pending = new Map();
+    const openFiles = new Map();
+
+    /*
+        These are the same host operations used by the original app.
+
+        Filesystem:
+            unlim8ted-code-list
+            unlim8ted-code-read
+            unlim8ted-code-write
+
+        System shell:
+            unlim8ted-code-run
+
+        New files and directories are created through the same system
+        shell used by the terminal, so no additional host API is needed.
+    */
+
+    function ask(type, payload = {}) {
+        const id = 'code-' + (++seq);
+
+        parent.postMessage({
+            type,
+            id,
+            ...payload
+        }, '*');
+
+        return new Promise((resolve, reject) => {
+            pending.set(id, { resolve, reject });
+
+            setTimeout(() => {
+                if (!pending.has(id)) return;
+
+                pending.delete(id);
+                reject(new Error('Request timed out'));
+            }, 120000);
+        });
+    }
+
+    addEventListener('message', event => {
+        const data = event.data || {};
+        const request = pending.get(data.id);
+
+        if (!request) return;
+
+        pending.delete(data.id);
+
+        if (data.ok) {
+            request.resolve(data);
+        } else {
+            request.reject(
+                new Error(data.error || 'Request failed')
+            );
+        }
+    });
+
+    function state(text) {
+        el.state.textContent = text;
+    }
+
+    function notify(text, error = false) {
+        el.toast.textContent = text;
+        el.toast.classList.toggle('error', error);
+        el.toast.classList.add('show');
+
+        clearTimeout(notify.timer);
+
+        notify.timer = setTimeout(() => {
+            el.toast.classList.remove('show');
+        }, 2200);
+    }
+
+    function escapeHTML(value) {
+        return String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function shellQuote(value) {
+        return "'" + String(value).replaceAll("'", "'\\''") + "'";
+    }
+
+    function joinPath(base, name) {
+        return base.replace(/\/+$/, '') + '/' + name.replace(/^\/+/, '');
+    }
+
+    function basename(path) {
+        const clean = path.replace(/\/+$/, '');
+        return clean.split('/').pop() || '/';
+    }
+
+    function dirname(path) {
+        let clean = path.replace(/\/+$/, '');
+
+        if (!clean || clean === '/') return '/';
+
+        const index = clean.lastIndexOf('/');
+
+        if (index <= 0) return '/';
+
+        return clean.slice(0, index);
+    }
+
+    function dirty(file) {
+        return !!file && file.text !== file.savedText;
+    }
+
+    function currentDirectory() {
+        return el.path.value.trim() || '/home/user';
+    }
+
+    function fileIcon(name, dir) {
+        if (dir) return '▸';
+
+        const ext = (name.split('.').pop() || '').toLowerCase();
+
+        return ({
+            js:'JS',
+            mjs:'JS',
+            cjs:'JS',
+            ts:'TS',
+            tsx:'TS',
+            jsx:'JS',
+            html:'<>',
+            css:'#',
+            json:'{}',
+            md:'M',
+            py:'Py',
+            rs:'Rs',
+            c:'C',
+            h:'H',
+            cpp:'C+',
+            cc:'C+',
+            sh:'$',
+            bash:'$',
+            go:'Go',
+            java:'J',
+            lua:'Lu',
+            php:'P',
+            rb:'Rb',
+            xml:'<>',
+            yaml:'Y',
+            yml:'Y',
+            toml:'T',
+            txt:'·'
+        })[ext] || '□';
+    }
+
+    function languageFor(path) {
+        const ext = (path.split('.').pop() || '').toLowerCase();
+
+        return ({
+            js:'JavaScript',
+            mjs:'JavaScript',
+            cjs:'JavaScript',
+            jsx:'JavaScript JSX',
+            ts:'TypeScript',
+            tsx:'TypeScript JSX',
+            html:'HTML',
+            htm:'HTML',
+            css:'CSS',
+            json:'JSON',
+            md:'Markdown',
+            py:'Python',
+            rs:'Rust',
+            c:'C',
+            h:'C/C++ Header',
+            cpp:'C++',
+            cc:'C++',
+            sh:'Shell',
+            bash:'Shell',
+            go:'Go',
+            java:'Java',
+            lua:'Lua',
+            php:'PHP',
+            rb:'Ruby',
+            xml:'XML',
+            yaml:'YAML',
+            yml:'YAML',
+            toml:'TOML'
+        })[ext] || 'Plain Text';
+    }
+
+    function syncBuffer() {
+        if (!currentFile) return;
+
+        const file = openFiles.get(currentFile);
+
+        if (file) {
+            file.text = el.code.value;
+        }
+    }
+
+    function renderTabs() {
+        el.tabs.innerHTML = '';
+
+        for (const file of openFiles.values()) {
+            const tab = document.createElement('div');
+
+            tab.className =
+                'tab' +
+                (file.path === currentFile ? ' active' : '');
+
+            tab.title = file.path;
+
+            const name = document.createElement('span');
+            name.className = 'tab-name';
+            name.textContent = file.name;
+
+            tab.appendChild(name);
+
+            if (dirty(file)) {
+                const mark = document.createElement('span');
+                mark.className = 'dirty';
+                mark.title = 'Unsaved changes';
+                tab.appendChild(mark);
+            }
+
+            const close = document.createElement('button');
+            close.className = 'close';
+            close.textContent = '×';
+
+            close.onclick = event => {
+                event.stopPropagation();
+                closeFile(file.path);
+            };
+
+            tab.onclick = () => selectFile(file.path);
+
+            tab.appendChild(close);
+            el.tabs.appendChild(tab);
+        }
+    }
+
+    function renderBreadcrumb(path) {
+        if (!path) {
+            el.breadcrumb.textContent = 'No file open';
+            return;
+        }
+
+        const parts = path.split('/').filter(Boolean);
+
+        let html = path.startsWith('/')
+            ? '<span>/</span>'
+            : '';
+
+        parts.forEach((part, index) => {
+            if (index || path.startsWith('/')) {
+                html += '<span class="sep">›</span>';
+            }
+
+            html += `<span>${escapeHTML(part)}</span>`;
+        });
+
+        el.breadcrumb.innerHTML = html;
+    }
+
+    function updatePosition() {
+        const pos = el.code.selectionStart || 0;
+        const before = el.code.value.slice(0, pos);
+        const lines = before.split('\n');
+
+        el.position.textContent =
+            `Ln ${lines.length}, Col ${lines.at(-1).length + 1}`;
+    }
+
+    function highlightCurrent() {
+        document.querySelectorAll('.file[data-path]')
+            .forEach(node => {
+                node.classList.toggle(
+                    'selected',
+                    node.dataset.path === currentFile
+                );
+            });
+    }
+
+    function selectFile(path) {
+        if (!openFiles.has(path)) return;
+
+        if (path !== currentFile) {
+            syncBuffer();
+        }
+
+        const file = openFiles.get(path);
+
+        currentFile = path;
+
+        el.code.disabled = false;
+        el.code.value = file.text;
+        el.welcome.style.display = 'none';
+
+        el.fileStatus.textContent = path;
+        el.language.textContent = languageFor(path);
+
+        renderTabs();
+        renderBreadcrumb(path);
+        highlightCurrent();
+        updatePosition();
+
+        el.code.focus();
+    }
+
+    async function openFile(path) {
+        try {
+            syncBuffer();
+
+            if (openFiles.has(path)) {
+                selectFile(path);
+                return;
+            }
+
+            state('Opening…');
+
+            const response = await ask(
+                'unlim8ted-code-read',
+                { path }
+            );
+
+            const text = response.text ?? '';
+
+            openFiles.set(path, {
+                path,
+                name: basename(path),
+                text,
+                savedText: text
+            });
+
+            selectFile(path);
+            state('Ready');
+        } catch (error) {
+            state('Error');
+            notify(error.message, true);
+        }
+    }
+
+    async function saveCurrent() {
+        if (!currentFile) {
+            notify('No file selected');
+            return;
+        }
+
+        const file = openFiles.get(currentFile);
+
+        if (!file) return;
+
+        file.text = el.code.value;
+
+        try {
+            state('Saving…');
+
+            await ask('unlim8ted-code-write', {
+                path: file.path,
+                text: file.text
+            });
+
+            file.savedText = file.text;
+
+            renderTabs();
+            state('Saved');
+            notify('Saved ' + file.name);
+        } catch (error) {
+            state('Save failed');
+            notify(error.message, true);
+        }
+    }
+
+    async function closeFile(path) {
+        const file = openFiles.get(path);
+
+        if (!file) return;
+
+        if (dirty(file) && !(await confirmModal(
+            'Discard changes?',
+            `Close ${file.name} without saving?`
+        ))) {
+            return;
+        }
+
+        const before = [...openFiles.keys()];
+        const index = before.indexOf(path);
+
+        openFiles.delete(path);
+
+        if (currentFile === path) {
+            currentFile = '';
+
+            const remaining = [...openFiles.keys()];
+            const next =
+                remaining[Math.min(index, remaining.length - 1)];
+
+            if (next) {
+                selectFile(next);
+            } else {
+                el.code.value = '';
+                el.code.disabled = true;
+                el.welcome.style.display = '';
+                el.fileStatus.textContent = 'No file selected';
+                el.language.textContent = 'Plain Text';
+                renderBreadcrumb('');
+            }
+        }
+
+        renderTabs();
+        highlightCurrent();
+    }
+
+    async function list() {
+        try {
+            state('Loading…');
+
+            const response = await ask(
+                'unlim8ted-code-list',
+                { path: currentDirectory() }
+            );
+
+            el.files.innerHTML = '';
+
+            const items = response.items || [];
+
+            if (!items.length) {
+                el.files.innerHTML =
+                    '<div class="empty">This directory is empty.</div>';
+
+                state('Ready');
+                return;
+            }
+
+            items.sort((a, b) => {
+                if (!!a.dir !== !!b.dir) {
+                    return a.dir ? -1 : 1;
+                }
+
+                return a.name.localeCompare(
+                    b.name,
+                    undefined,
+                    { sensitivity:'base' }
+                );
+            });
+
+            for (const item of items) {
+                const row = document.createElement('div');
+
+                row.className =
+                    'file' +
+                    (item.dir ? ' dir' : '') +
+                    (item.path === currentFile ? ' selected' : '');
+
+                row.dataset.path = item.path;
+                row.title = item.path;
+
+                const icon = document.createElement('span');
+                icon.className = 'file-icon';
+                icon.textContent = fileIcon(item.name, item.dir);
+
+                const name = document.createElement('span');
+                name.className = 'file-name';
+                name.textContent = item.name;
+
+                row.append(icon, name);
+
+                row.ondblclick = () => {
+                    if (!item.dir) openFile(item.path);
+                };
+
+                row.onclick = () => {
+                    if (item.dir) {
+                        el.path.value = item.path;
+                        list();
+                    } else {
+                        openFile(item.path);
+                    }
+                };
+
+                el.files.appendChild(row);
+            }
+
+            state('Ready');
+        } catch (error) {
+            state('Error');
+
+            el.files.innerHTML =
+                `<div class="empty">${escapeHTML(error.message)}</div>`;
+
+            notify(error.message, true);
+        }
+    }
+
+    function promptModal(title, description, placeholder = '') {
+        return new Promise(resolve => {
+            modalResolver = resolve;
+            modalMode = 'prompt';
+
+            el.modalTitle.textContent = title;
+            el.modalText.textContent = description;
+            el.modalInput.value = '';
+            el.modalInput.placeholder = placeholder;
+            el.modalInput.style.display = '';
+            el.modalOK.textContent = 'Create';
+
+            el.modalback.classList.add('show');
+
+            requestAnimationFrame(() => {
+                el.modalInput.focus();
+            });
+        });
+    }
+
+    function confirmModal(title, description) {
+        return new Promise(resolve => {
+            modalResolver = resolve;
+            modalMode = 'confirm';
+
+            el.modalTitle.textContent = title;
+            el.modalText.textContent = description;
+            el.modalInput.value = '';
+            el.modalInput.style.display = 'none';
+            el.modalOK.textContent = 'Discard';
+
+            el.modalback.classList.add('show');
+
+            requestAnimationFrame(() => {
+                el.modalOK.focus();
+            });
+        });
+    }
+
+    function closeModal(value = null) {
+        el.modalback.classList.remove('show');
+
+        const resolve = modalResolver;
+        modalResolver = null;
+
+        if (resolve) resolve(value);
+    }
+
+    async function createFile() {
+        const name = await promptModal(
+            'New file',
+            `Create a file in ${currentDirectory()}`,
+            'example.js'
+        );
+
+        if (!name) return;
+
+        const trimmed = name.trim();
+
+        if (
+            !trimmed ||
+            trimmed === '.' ||
+            trimmed === '..' ||
+            trimmed.includes('/')
+        ) {
+            notify('Enter a valid file name', true);
+            return;
+        }
+
+        const path = joinPath(currentDirectory(), trimmed);
+
+        try {
+            state('Creating…');
+
+            /*
+                Write an empty file directly through the filesystem bridge.
+                This both creates the file and verifies that it is writable.
+            */
+            await ask('unlim8ted-code-write', {
+                path,
+                text:''
+            });
+
+            await list();
+            await openFile(path);
+
+            state('Ready');
+            notify('Created ' + trimmed);
+        } catch (error) {
+            state('Create failed');
+            notify(error.message, true);
+        }
+    }
+
+    async function createFolder() {
+        const name = await promptModal(
+            'New folder',
+            `Create a directory in ${currentDirectory()}`,
+            'folder'
+        );
+
+        if (!name) return;
+
+        const trimmed = name.trim();
+
+        if (
+            !trimmed ||
+            trimmed === '.' ||
+            trimmed === '..' ||
+            trimmed.includes('/')
+        ) {
+            notify('Enter a valid directory name', true);
+            return;
+        }
+
+        const path = joinPath(currentDirectory(), trimmed);
+
+        try {
+            state('Creating…');
+
+            /*
+                Directory creation uses the system shell exposed by the
+                existing host. shellQuote prevents the entered name from
+                being interpreted as shell syntax.
+            */
+            await ask('unlim8ted-code-run', {
+                cmd:`mkdir -- ${shellQuote(path)}`
+            });
+
+            await list();
+
+            state('Ready');
+            notify('Created ' + trimmed);
+        } catch (error) {
+            state('Create failed');
+            notify(error.message, true);
+        }
+    }
+
+    async function runCommand() {
+        const cmd = el.command.value.trim();
+
+        if (!cmd) return;
+
+        commandHistory.push(cmd);
+        historyIndex = commandHistory.length;
+
+        el.output.textContent +=
+            (el.output.textContent ? '\n' : '') +
+            `$ ${cmd}\n`;
+
+        el.output.scrollTop = el.output.scrollHeight;
+
+        try {
+            state('Running…');
+
+            /*
+                This intentionally uses the existing system command bridge,
+                matching the terminal behavior from the original editor.
+            */
+            const response = await ask(
+                'unlim8ted-code-run',
+                { cmd }
+            );
+
+            el.output.textContent +=
+                response.output || '(no output)';
+
+            state('Ready');
+        } catch (error) {
+            el.output.textContent +=
+                `Error: ${error.message}`;
+
+            state('Command failed');
+        }
+
+        el.output.textContent += '\n';
+        el.output.scrollTop = el.output.scrollHeight;
+
+        /*
+            Commands can create, remove, or rename files, so refresh the
+            explorer after execution.
+        */
+        list().catch(() => {});
+        el.command.focus();
+    }
+
+    el.code.addEventListener('input', () => {
+        if (!currentFile) return;
+
+        const file = openFiles.get(currentFile);
+
+        if (file) {
+            file.text = el.code.value;
+        }
+
+        renderTabs();
+        updatePosition();
+    });
+
+    el.code.addEventListener('keydown', event => {
+        if (event.key !== 'Tab') return;
+
+        event.preventDefault();
+
+        const start = el.code.selectionStart;
+        const end = el.code.selectionEnd;
+        const value = el.code.value;
+
+        el.code.value =
+            value.slice(0, start) +
+            '    ' +
+            value.slice(end);
+
+        el.code.selectionStart =
+            el.code.selectionEnd =
+            start + 4;
+
+        el.code.dispatchEvent(
+            new Event('input', { bubbles:true })
+        );
+    });
+
+    ['click','keyup','select'].forEach(type => {
+        el.code.addEventListener(type, updatePosition);
+    });
+
+    $('save').onclick = saveCurrent;
+    $('refresh').onclick = list;
+    $('sideRefresh').onclick = list;
+    $('newFile').onclick = createFile;
+    $('newFolder').onclick = createFolder;
+
+    $('up').onclick = () => {
+        el.path.value = dirname(currentDirectory());
+        list();
+    };
+
+    el.path.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            list();
+        }
+    });
+
+    $('run').onclick = runCommand;
+
+    $('clearTerminal').onclick = () => {
+        el.output.textContent = '';
+        el.command.focus();
+    };
+
+    el.command.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            runCommand();
+            return;
+        }
+
+        if (
+            event.key === 'ArrowUp' &&
+            commandHistory.length
+        ) {
+            event.preventDefault();
+
+            historyIndex = Math.max(
+                0,
+                historyIndex - 1
+            );
+
+            el.command.value =
+                commandHistory[historyIndex] || '';
+        }
+
+        if (
+            event.key === 'ArrowDown' &&
+            commandHistory.length
+        ) {
+            event.preventDefault();
+
+            historyIndex = Math.min(
+                commandHistory.length,
+                historyIndex + 1
+            );
+
+            el.command.value =
+                commandHistory[historyIndex] || '';
+        }
+    });
+
+    el.modalOK.onclick = () => {
+        closeModal(modalMode === 'confirm' ? true : el.modalInput.value);
+    };
+
+    $('modalCancel').onclick = () => {
+        closeModal(null);
+    };
+
+    el.modalInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            closeModal(modalMode === 'confirm' ? true : el.modalInput.value);
+        }
+
+        if (event.key === 'Escape') {
+            closeModal(null);
+        }
+    });
+
+    el.modalback.addEventListener('mousedown', event => {
+        if (event.target === el.modalback) {
+            closeModal(null);
+        }
+    });
+
+    addEventListener('keydown', event => {
+        const mod = event.ctrlKey || event.metaKey;
+
+        if (mod && event.key.toLowerCase() === 's') {
+            event.preventDefault();
+            saveCurrent();
+        }
+
+        if (mod && event.key.toLowerCase() === 'n') {
+            event.preventDefault();
+            createFile();
+        }
+
+        if (mod && event.key.toLowerCase() === 'w') {
+            if (!currentFile) return;
+
+            event.preventDefault();
+            closeFile(currentFile);
+        }
+
+        if (mod && event.key === '`') {
+            event.preventDefault();
+            el.command.focus();
+        }
+
+        if (
+            mod &&
+            event.shiftKey &&
+            event.key.toLowerCase() === 'r'
+        ) {
+            event.preventDefault();
+            list();
+        }
+    });
+
+    addEventListener('beforeunload', event => {
+        if (![...openFiles.values()].some(dirty)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.returnValue = '';
+    });
+
+    list();
+})();
+</script>
+</body>
+</html>
