@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Terminal</title>
+    <style>
+        * {
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #17181a;
+            color: #e8eaed
+        }
+
+        .terminal {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace
+        }
+
+        .status {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            border-bottom: 1px solid #2c2d30;
+            color: #81c995;
+            font-size: 11px
+        }
+
+        .termout {
+            white-space: pre-wrap;
+            overflow: auto;
+            flex: 1;
+            user-select: text;
+            padding: 8px
+        }
+
+        .termin {
+            border: 0;
+            border-top: 1px solid #2c2d30;
+            outline: 0;
+            background: #17181a;
+            color: #e8eaed;
+            height: 34px;
+            padding: 0 8px;
+            font: inherit
+        }
+    </style>
+</head>
+
+<body>
+    <div class="terminal">
+        <div id="termout" class="termout">Unlim8ted terminal</div><input id="termin" class="termin" autocomplete="off"
+            spellcheck="false" placeholder="Type a command…">
+    </div>
+    <script>
+        const out = document.getElementById('termout'), input = document.getElementById('termin'); window.addEventListener('message', e => { const d = e.data || {}; if (d.type === 'unlim8ted-terminal-output') { out.textContent += d.text || ''; out.scrollTop = out.scrollHeight } else if (d.type === 'unlim8ted-terminal-status') status.textContent = d.text || '' }); input.addEventListener('keydown', e => { if (e.key === 'Enter') { parent.postMessage({ type: 'unlim8ted-terminal-command', command: input.value }, '*'); input.value = '' } else if (e.key === 'Backspace' && input.value === '') parent.postMessage({ type: 'unlim8ted-terminal-backspace' }, '*') }); parent.postMessage({ type: 'unlim8ted-terminal-ready' }, '*');
+    </script>
+</body>
+
+</html>

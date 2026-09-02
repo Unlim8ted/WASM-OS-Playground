@@ -1,0 +1,2988 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Unlim8ted Browser</title>
+<style>
+            :root {
+                --shelf-h: 56px;
+                --blue: #8ab4f8;
+                --blue2: #a8c7fa;
+                --ink: #e8eaed;
+                --muted: #9aa0a6;
+                --bg: #111315;
+                --surface: #202124;
+                --surface2: #292a2d;
+                --surface3: #303134;
+                --surface4: #3c4043;
+                --line: #3c4043;
+                --hover: #ffffff12;
+                --pressed: #ffffff1e;
+                --shadow: 0 16px 48px #0008;
+                color-scheme: dark;
+                font-family: Roboto, "Noto Sans", Arial, sans-serif;
+            }
+
+            :root[data-theme="light"] {
+                --ink: #202124;
+                --muted: #5f6368;
+                --bg: #f8f9fa;
+                --surface: #fff;
+                --surface2: #f1f3f4;
+                --surface3: #e8eaed;
+                --surface4: #dadce0;
+                --line: #dadce0;
+                --hover: #0000000a;
+                --pressed: #00000014;
+                --shadow: 0 16px 48px #0003;
+                color-scheme: light;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            html,
+            body {
+                margin: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: #111315;
+                color: var(--ink);
+                font-size: 14px;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            button,
+            input {
+                font: inherit;
+                color: inherit;
+            }
+
+            button {
+                border: 0;
+                background: none;
+                padding: 0;
+            }
+
+            .desktop {
+                position: fixed;
+                inset: 0;
+                overflow: hidden;
+                user-select: none;
+                background: #101215;
+            }
+
+            .wallpaper {
+                position: absolute;
+                inset: 0 0 var(--shelf-h);
+                background: radial-gradient(58% 70% at 75% 42%, #2554b9 0 24%, transparent 25%),
+                    radial-gradient(54% 68% at 72% 40%, #172968 0 35%, transparent 36%),
+                    radial-gradient(45% 66% at 41% 36%, #663448 0 28%, transparent 29%),
+                    radial-gradient(60% 80% at 48% 65%, #151b37 0 54%, #0f1117 76%);
+                background-color: #101217;
+                transition:
+                    0.2s filter,
+                    0.2s background;
+            }
+
+            :root[data-theme="light"] .wallpaper {
+                filter: brightness(1.55) saturate(0.9);
+            }
+
+            .wallpaper::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(180deg, #0001, #0000 45%, #0004);
+            }
+
+            /* ChromeOS shelf */
+            .shelfbar {
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                height: var(--shelf-h);
+                z-index: 950;
+                background: color-mix(in srgb, var(--surface) 72%, transparent);
+                backdrop-filter: blur(22px) saturate(135%);
+                -webkit-backdrop-filter: blur(22px) saturate(135%);
+                border-top: 1px solid #ffffff0b;
+                display: grid;
+                grid-template-columns: 180px 1fr 270px;
+                align-items: center;
+                padding: 0 8px;
+            }
+
+            .shelf-left {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .launcher-btn {
+                width: 42px;
+                height: 42px;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                cursor: pointer;
+            }
+
+            .launcher-btn:hover {
+                background: var(--hover);
+            }
+
+            .launcher-mark {
+                width: 22px;
+                height: 22px;
+                border-radius: 50%;
+                background: #f1f3f4;
+                box-shadow: inset 0 0 0 6px #c6c9ce;
+            }
+
+            .shelf-center {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 5px;
+                min-width: 0;
+            }
+
+            .shelf-app {
+                position: relative;
+                width: 44px;
+                height: 44px;
+                border-radius: 14px;
+                display: grid;
+                place-items: center;
+                cursor: pointer;
+                transition:
+                    0.12s background,
+                    0.12s transform;
+            }
+
+            .shelf-app:hover {
+                background: var(--hover);
+            }
+
+            .shelf-app:active {
+                transform: scale(0.94);
+            }
+
+            .shelf-app.running::after {
+                content: "";
+                position: absolute;
+                bottom: 1px;
+                width: 4px;
+                height: 4px;
+                border-radius: 50%;
+                background: var(--blue2);
+            }
+
+            .shelf-app.active {
+                background: #ffffff1a;
+            }
+
+            .shelf-tray {
+                justify-self: end;
+                height: 40px;
+                min-width: 210px;
+                border-radius: 20px;
+                padding: 0 14px;
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 9px;
+                cursor: pointer;
+            }
+
+            .shelf-tray:hover,
+            .shelf-tray.open {
+                background: var(--hover);
+            }
+
+            .tray-date {
+                font-size: 12px;
+                line-height: 15px;
+                text-align: right;
+                font-weight: 500;
+                min-width: 70px;
+            }
+
+            .tray-icon {
+                width: 18px;
+                height: 18px;
+                display: grid;
+                place-items: center;
+                color: var(--ink);
+                opacity: 0.95;
+            }
+
+            .battery {
+                font-size: 12px;
+                font-weight: 500;
+                min-width: 28px;
+            }
+
+            /* reusable icons */
+            .app-icon {
+                width: 34px;
+                height: 34px;
+                position: relative;
+                display: grid;
+                place-items: center;
+                flex: 0 0 auto;
+            }
+
+            .app-icon.chrome {
+                border-radius: 50%;
+                background: conic-gradient(#ea4335 0 33.33%, #fbbc04 0 66.66%, #34a853 0);
+            }
+
+            .app-icon.chrome::before {
+                content: "";
+                width: 15px;
+                height: 15px;
+                border-radius: 50%;
+                background: #4285f4;
+                border: 3px solid #e8f0fe;
+                box-sizing: border-box;
+            }
+
+            .app-icon.files::before {
+                content: "";
+                width: 31px;
+                height: 23px;
+                border-radius: 4px;
+                background: #5f9cf6;
+                box-shadow: inset 0 -7px #7fb0fa;
+            }
+
+            .app-icon.files::after {
+                content: "";
+                position: absolute;
+                left: 2px;
+                top: 4px;
+                width: 14px;
+                height: 7px;
+                border-radius: 4px 4px 0 0;
+                background: #8ab4f8;
+            }
+
+            .app-icon.terminal {
+                border-radius: 50%;
+                background: #39424e;
+                color: #fff;
+                font:
+                    700 15px/1 ui-monospace,
+                    monospace;
+            }
+
+            .app-icon.terminal::before {
+                content: ">_";
+            }
+
+            .app-icon.store {
+                border-radius: 8px;
+                background: #fff;
+            }
+
+            .app-icon.store::before {
+                content: "";
+                width: 0;
+                height: 0;
+                border-left: 10px solid #34a853;
+                border-top: 7px solid transparent;
+                border-bottom: 7px solid transparent;
+                filter: drop-shadow(-5px 0 #fbbc04) drop-shadow(5px 0 #4285f4);
+            }
+
+            .app-icon.settings {
+                border-radius: 50%;
+                background: #5f6368;
+                color: white;
+                font-size: 25px;
+            }
+
+            .app-icon.settings::before {
+                content: "⚙";
+                font-family: Arial, sans-serif;
+                line-height: 1;
+            }
+
+            .app-icon.notes {
+                border-radius: 9px;
+                background: #fbbc04;
+                color: #202124;
+                font-size: 20px;
+            }
+
+            .app-icon.notes::before {
+                content: "▤";
+            }
+
+            .app-icon.canvas {
+                border-radius: 9px;
+                background: linear-gradient(135deg, #f28b82, #fdd663 35%, #81c995 68%, #8ab4f8);
+            }
+
+            /* launcher */
+            .launcher {
+                position: absolute;
+                z-index: 940;
+                left: 12px;
+                bottom: 68px;
+                width: min(610px, calc(100vw - 24px));
+                height: min(610px, calc(100vh - 90px));
+                border-radius: 26px;
+                background: color-mix(in srgb, var(--surface) 94%, transparent);
+                box-shadow: var(--shadow);
+                border: 1px solid #ffffff10;
+                backdrop-filter: blur(28px);
+                padding: 22px 24px;
+                display: none;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .launcher.open {
+                display: flex;
+            }
+
+            .launch-search-wrap {
+                height: 48px;
+                border-radius: 24px;
+                background: var(--surface3);
+                display: flex;
+                align-items: center;
+                padding: 0 18px;
+                gap: 12px;
+                flex: 0 0 auto;
+            }
+
+            .launch-search-wrap svg {
+                width: 20px;
+                height: 20px;
+                color: var(--muted);
+            }
+
+            .launchsearch {
+                border: 0;
+                outline: 0;
+                background: transparent;
+                flex: 1;
+                font-size: 15px;
+            }
+
+            .launchsearch::placeholder {
+                color: var(--muted);
+            }
+
+            .launcher-kicker {
+                margin: 22px 4px 11px;
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--muted);
+            }
+
+            .continue-row {
+                display: flex;
+                gap: 10px;
+            }
+
+            .continue-card {
+                flex: 1;
+                min-width: 0;
+                height: 70px;
+                border-radius: 14px;
+                background: var(--surface3);
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                padding: 10px 13px;
+                cursor: pointer;
+            }
+
+            .continue-card:hover {
+                background: var(--surface4);
+            }
+
+            .continue-card b,
+            .continue-card span {
+                display: block;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .continue-card span {
+                font-size: 12px;
+                color: var(--muted);
+                margin-top: 3px;
+            }
+
+            .appgrid {
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 12px 6px;
+                overflow: auto;
+                padding: 4px 2px 14px;
+            }
+
+            .appbtn {
+                height: 88px;
+                border-radius: 14px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                gap: 8px;
+                font-size: 12px;
+                cursor: pointer;
+                text-align: center;
+            }
+
+            .appbtn:hover {
+                background: var(--hover);
+            }
+
+            .appbtn .app-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            .appbtn .app-icon.chrome::before {
+                width: 18px;
+                height: 18px;
+            }
+
+            .appbtn .app-icon.files::before {
+                width: 36px;
+                height: 27px;
+            }
+
+            .appbtn .app-icon.settings {
+                font-size: 29px;
+            }
+
+            /* Quick Settings */
+            .quick-panel {
+                position: absolute;
+                z-index: 945;
+                right: 12px;
+                bottom: 68px;
+                width: 390px;
+                max-height: calc(100vh - 84px);
+                border-radius: 26px;
+                background: color-mix(in srgb, var(--surface) 96%, transparent);
+                box-shadow: var(--shadow);
+                border: 1px solid #ffffff10;
+                backdrop-filter: blur(28px);
+                padding: 14px;
+                display: none;
+                overflow: auto;
+            }
+
+            .quick-panel.open {
+                display: block;
+            }
+
+            .q-head {
+                height: 52px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 0 4px 8px;
+            }
+
+            .avatar {
+                width: 34px;
+                height: 34px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #8ab4f8, #c58af9);
+                display: grid;
+                place-items: center;
+                color: #202124;
+                font-weight: 700;
+            }
+
+            .signout {
+                height: 34px;
+                padding: 0 15px;
+                border-radius: 17px;
+                background: var(--surface3);
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            .q-round {
+                margin-left: auto;
+                width: 34px;
+                height: 34px;
+                border-radius: 50%;
+                background: var(--surface3);
+                display: grid;
+                place-items: center;
+                cursor: pointer;
+                font-size: 17px;
+            }
+
+            .q-round + .q-round {
+                margin-left: 0;
+            }
+
+            .q-round:hover {
+                background: var(--surface4);
+            }
+
+            .q-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .q-tile {
+                height: 76px;
+                border-radius: 16px;
+                background: var(--surface3);
+                padding: 12px;
+                display: flex;
+                gap: 11px;
+                align-items: center;
+                cursor: pointer;
+                text-align: left;
+            }
+
+            .q-tile.on {
+                background: #8ab4f8;
+                color: #10284f;
+            }
+
+            .q-tile:hover {
+                filter: brightness(1.06);
+            }
+
+            .q-circle {
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #ffffff18;
+                display: grid;
+                place-items: center;
+                font-size: 18px;
+            }
+
+            .q-tile.on .q-circle {
+                background: #0b57d022;
+            }
+
+            .q-copy b,
+            .q-copy span {
+                display: block;
+            }
+
+            .q-copy b {
+                font-size: 13px;
+            }
+
+            .q-copy span {
+                font-size: 11px;
+                opacity: 0.75;
+                margin-top: 3px;
+            }
+
+            .slider-row {
+                height: 50px;
+                display: grid;
+                grid-template-columns: 36px 1fr 28px;
+                align-items: center;
+                gap: 8px;
+                margin-top: 6px;
+            }
+
+            .slider-row input {
+                accent-color: #8ab4f8;
+                width: 100%;
+            }
+
+            .q-footer {
+                display: flex;
+                justify-content: space-between;
+                color: var(--muted);
+                font-size: 12px;
+                border-top: 1px solid var(--line);
+                padding: 12px 5px 2px;
+                margin-top: 7px;
+            }
+
+            /* windows */
+            .win {
+                position: absolute;
+                display: none;
+                flex-direction: column;
+                min-width: 440px;
+                min-height: 300px;
+                border-radius: 12px;
+                background: var(--surface);
+                color: var(--ink);
+                box-shadow: 0 18px 70px #000b;
+                overflow: hidden;
+                resize: both;
+                border: 1px solid #ffffff0b;
+                z-index: 20;
+            }
+
+            .win.open {
+                display: flex;
+            }
+
+            .win.focused {
+                box-shadow: 0 20px 80px #000d;
+            }
+
+            .app-titlebar {
+                height: 42px;
+                flex: 0 0 auto;
+                background: var(--surface2);
+                display: flex;
+                align-items: center;
+                padding-left: 14px;
+                border-bottom: 1px solid var(--line);
+                user-select: none;
+            }
+
+            .app-title {
+                flex: 1;
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            .window-controls {
+                display: flex;
+                height: 100%;
+                margin-left: auto;
+            }
+
+            .window-controls button {
+                width: 46px;
+                height: 100%;
+                display: grid;
+                place-items: center;
+                color: var(--ink);
+                cursor: pointer;
+                font-size: 16px;
+            }
+
+            .window-controls button:hover {
+                background: var(--hover);
+            }
+
+            .window-controls .close:hover {
+                background: #c42b1c;
+                color: #fff;
+            }
+
+            .window-controls .min::before {
+                content: "";
+                width: 10px;
+                border-top: 1px solid currentColor;
+            }
+
+            .window-controls .max::before {
+                content: "";
+                width: 10px;
+                height: 8px;
+                border: 1px solid currentColor;
+            }
+
+            .app-body {
+                flex: 1;
+                min-height: 0;
+                position: relative;
+                background: var(--surface);
+            }
+
+            /* Chrome browser */
+            #browserWin {
+                left: 4%;
+                top: 3%;
+                width: 92%;
+                height: 86%;
+                min-width: 720px;
+            }
+
+            .chrome-frame {
+                background: #202124;
+            }
+
+            .chrome-tabs {
+                height: 44px;
+                background: #202124;
+                display: flex;
+                align-items: flex-end;
+                padding: 0 0 0 8px;
+                user-select: none;
+            }
+
+            .tabs {
+                display: flex;
+                align-items: flex-end;
+                min-width: 0;
+                flex: 1;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            .tab {
+                position: relative;
+                height: 36px;
+                min-width: 95px;
+                max-width: 240px;
+                flex: 1;
+                border-radius: 10px 10px 0 0;
+                padding: 0 10px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: #bdc1c6;
+                font-size: 12px;
+                cursor: pointer;
+            }
+
+            .tab:hover {
+                background: #303134;
+            }
+
+            .tab.active {
+                background: #35363a;
+                color: #e8eaed;
+            }
+
+            .tab.active::before,
+            .tab.active::after {
+                content: "";
+                position: absolute;
+                bottom: 0;
+                width: 10px;
+                height: 10px;
+                background: #202124;
+            }
+
+            .tab.active::before {
+                left: -10px;
+                border-bottom-right-radius: 10px;
+            }
+
+            .tab.active::after {
+                right: -10px;
+                border-bottom-left-radius: 10px;
+            }
+
+            .tab-favicon {
+                width: 15px;
+                height: 15px;
+                border-radius: 50%;
+                background: conic-gradient(#ea4335 0 33%, #fbbc04 0 66%, #34a853 0);
+                position: relative;
+                flex: 0 0 auto;
+            }
+
+            .tab-favicon::after {
+                content: "";
+                position: absolute;
+                inset: 4px;
+                border-radius: 50%;
+                background: #4285f4;
+            }
+
+            .tab .txt {
+                min-width: 0;
+                flex: 1;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tab-x {
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                font-size: 15px;
+            }
+
+            .tab-x:hover {
+                background: #ffffff20;
+            }
+
+            .newtabbtn {
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                margin: 0 4px 3px 5px;
+                color: #bdc1c6;
+                font-size: 20px;
+                cursor: pointer;
+            }
+
+            .newtabbtn:hover {
+                background: #ffffff16;
+            }
+
+            .chrome-window-controls {
+                height: 44px;
+                display: flex;
+                align-self: flex-start;
+            }
+
+            .chrome-window-controls button {
+                width: 46px;
+                height: 44px;
+                color: #e8eaed;
+                display: grid;
+                place-items: center;
+                cursor: pointer;
+            }
+
+            .chrome-window-controls button:hover {
+                background: #ffffff16;
+            }
+
+            .chrome-window-controls .close:hover {
+                background: #c42b1c;
+            }
+
+            .chrome-window-controls .min::before {
+                content: "";
+                width: 10px;
+                border-top: 1px solid currentColor;
+            }
+
+            .chrome-window-controls .max::before {
+                content: "";
+                width: 10px;
+                height: 8px;
+                border: 1px solid currentColor;
+            }
+
+            .chrome-toolbar {
+                height: 48px;
+                background: #35363a;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                padding: 6px 8px;
+                border-bottom: 1px solid #2b2c2e;
+            }
+
+            .navbtn {
+                width: 34px;
+                height: 34px;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                color: #bdc1c6;
+                cursor: pointer;
+                font-size: 20px;
+            }
+
+            .navbtn:hover {
+                background: #ffffff14;
+            }
+
+            .navbtn:disabled {
+                opacity: 0.35;
+            }
+
+            .omnibox-wrap {
+                height: 36px;
+                border-radius: 18px;
+                background: #202124;
+                display: flex;
+                align-items: center;
+                flex: 1;
+                min-width: 120px;
+                border: 1px solid transparent;
+            }
+
+            .omnibox-wrap:focus-within {
+                background: #202124;
+                border-color: #8ab4f8;
+            }
+
+            .site-chip {
+                width: 34px;
+                height: 34px;
+                display: grid;
+                place-items: center;
+                color: #9aa0a6;
+            }
+
+            .omnibox {
+                min-width: 0;
+                flex: 1;
+                height: 100%;
+                border: 0;
+                outline: 0;
+                background: transparent;
+                color: #e8eaed;
+                font-size: 14px;
+            }
+
+            .toolbar-action {
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                color: #bdc1c6;
+                cursor: pointer;
+            }
+
+            .toolbar-action:hover {
+                background: #ffffff12;
+            }
+
+            .browser-content {
+                position: relative;
+                flex: 1;
+                min-height: 0;
+                background: #202124;
+                overflow: hidden;
+                contain: strict;
+            }
+
+            .gecko-canvas {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                display: none;
+                background: #fff;
+                outline: 0;
+                touch-action: none;
+                overscroll-behavior: none;
+            }
+
+            .newtab {
+                position: absolute;
+                inset: 0;
+                background: #202124;
+                color: #e8eaed;
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                flex-direction: column;
+                padding-top: min(15vh, 120px);
+            }
+
+            .newtab-logo {
+                font-size: 54px;
+                letter-spacing: -2px;
+                font-weight: 500;
+                margin-bottom: 34px;
+            }
+
+            .newtab-logo .u8 {
+                color: #8ab4f8;
+            }
+
+            .searchbox {
+                width: min(580px, 72%);
+                height: 46px;
+                border-radius: 23px;
+                background: #303134;
+                display: flex;
+                align-items: center;
+                padding: 0 18px;
+                gap: 13px;
+                box-shadow: 0 1px 6px #0007;
+            }
+
+            .searchbox:hover {
+                background: #3c4043;
+            }
+
+            .searchbox input {
+                border: 0;
+                outline: 0;
+                background: transparent;
+                color: #e8eaed;
+                flex: 1;
+                font-size: 15px;
+            }
+
+            .shortcuts {
+                display: flex;
+                gap: 16px;
+                margin-top: 28px;
+            }
+
+            .shortcut {
+                width: 96px;
+                height: 96px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                gap: 9px;
+                font-size: 12px;
+                cursor: pointer;
+            }
+
+            .shortcut:hover {
+                background: #ffffff0b;
+            }
+
+            .shortcut i {
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: #303134;
+                display: grid;
+                place-items: center;
+                font-style: normal;
+                font-size: 17px;
+            }
+
+            .bootstate {
+                position: absolute;
+                inset: 0;
+                background: #202124;
+                display: none;
+                place-items: center;
+                z-index: 5;
+            }
+
+            .bootcard {
+                width: min(430px, 75%);
+                text-align: center;
+            }
+
+            .bootcard h2 {
+                font-size: 20px;
+                font-weight: 500;
+                margin: 0 0 18px;
+            }
+
+            .progress {
+                height: 4px;
+                background: #3c4043;
+                border-radius: 2px;
+                overflow: hidden;
+            }
+
+            .progress span {
+                display: block;
+                height: 100%;
+                width: 5%;
+                background: #8ab4f8;
+                transition: 0.25s;
+            }
+
+            .small {
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+            .bootmsg {
+                margin-top: 12px;
+            }
+
+            .error {
+                margin-top: 11px;
+                color: #f28b82;
+                white-space: pre-wrap;
+                font:
+                    12px/1.5 ui-monospace,
+                    monospace;
+            }
+
+            .page-load {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 2px;
+                z-index: 7;
+                pointer-events: none;
+                overflow: hidden;
+                display: none;
+            }
+
+            .page-load::before {
+                content: "";
+                display: block;
+                width: 40%;
+                height: 100%;
+                background: #8ab4f8;
+                animation: pageload 1s infinite ease-in-out;
+            }
+
+            @keyframes pageload {
+                from {
+                    transform: translateX(-110%);
+                }
+
+                to {
+                    transform: translateX(350%);
+                }
+            }
+
+            /* Files */
+            #filesWin {
+                left: 10%;
+                top: 7%;
+                width: 80%;
+                height: 78%;
+            }
+
+            .files-layout {
+                display: grid;
+                grid-template-columns: 220px 1fr;
+                height: 100%;
+                background: var(--surface);
+            }
+
+            .files-sidebar {
+                padding: 12px 8px;
+                background: var(--surface2);
+                border-right: 1px solid var(--line);
+            }
+
+            .files-side-title {
+                font-size: 12px;
+                color: var(--muted);
+                padding: 8px 15px;
+            }
+
+            .sideitem {
+                height: 40px;
+                border-radius: 20px;
+                padding: 0 15px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                cursor: pointer;
+            }
+
+            .sideitem:hover {
+                background: var(--hover);
+            }
+
+            .sideitem.sel {
+                background: #8ab4f820;
+                color: #aecbfa;
+            }
+
+            .filesmain {
+                display: flex;
+                flex-direction: column;
+                min-width: 0;
+            }
+
+            .filetop {
+                height: 56px;
+                display: flex;
+                align-items: center;
+                padding: 0 16px;
+                border-bottom: 1px solid var(--line);
+                gap: 8px;
+            }
+
+            .filetop .path {
+                flex: 1;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .pill {
+                height: 34px;
+                padding: 0 14px;
+                border: 1px solid var(--line);
+                border-radius: 17px;
+                cursor: pointer;
+                background: var(--surface2);
+            }
+
+            .pill:hover {
+                background: var(--surface3);
+            }
+
+            .fileheader,
+            .frow {
+                display: grid;
+                grid-template-columns: minmax(260px, 1fr) 120px 180px;
+                align-items: center;
+                padding: 0 16px;
+            }
+
+            .fileheader {
+                height: 38px;
+                color: var(--muted);
+                font-size: 12px;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .filelist {
+                overflow: auto;
+                flex: 1;
+            }
+
+            .frow {
+                height: 44px;
+                border-bottom: 1px solid #ffffff08;
+                cursor: default;
+            }
+
+            .frow:hover {
+                background: var(--hover);
+            }
+
+            .fname {
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                min-width: 0;
+            }
+
+            .file-glyph {
+                width: 22px;
+                height: 22px;
+                display: grid;
+                place-items: center;
+                font-size: 18px;
+            }
+
+            .filename {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* terminal */
+            #terminalWin {
+                left: 15%;
+                top: 10%;
+                width: 70%;
+                height: 70%;
+            }
+
+            .terminal {
+                position: absolute;
+                inset: 0;
+                background: #17181a;
+                color: #e8eaed;
+                padding: 10px 13px;
+                display: flex;
+                flex-direction: column;
+                font:
+                    13px/1.45 ui-monospace,
+                    SFMono-Regular,
+                    Menlo,
+                    Consolas,
+                    monospace;
+            }
+
+            .termout {
+                white-space: pre-wrap;
+                overflow: auto;
+                flex: 1;
+                user-select: text;
+            }
+
+            .termin {
+                border: 0;
+                border-top: 1px solid #2c2d30;
+                outline: 0;
+                background: #17181a;
+                color: #e8eaed;
+                height: 34px;
+                font: inherit;
+            }
+
+            .term-badge {
+                font-size: 11px;
+                color: #81c995;
+                margin-right: 10px;
+            }
+
+            /* Store */
+            #storeWin {
+                left: 12%;
+                top: 8%;
+                width: 76%;
+                height: 74%;
+            }
+
+            .storebody {
+                height: 100%;
+                overflow: auto;
+                padding: 26px;
+                background: var(--surface);
+            }
+
+            .storehero {
+                height: 156px;
+                border-radius: 22px;
+                background: linear-gradient(120deg, #174ea6, #6c3baa);
+                padding: 26px;
+                color: white;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+
+            .storehero h2 {
+                font-size: 28px;
+                margin: 0 0 8px;
+            }
+
+            .storehero p {
+                margin: 0;
+                opacity: 0.8;
+            }
+
+            .storegrid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 14px;
+                margin-top: 20px;
+            }
+
+            .appcard {
+                border: 1px solid var(--line);
+                border-radius: 18px;
+                padding: 18px;
+                background: var(--surface2);
+                min-height: 160px;
+            }
+
+            .appcard-top {
+                display: flex;
+                gap: 13px;
+                align-items: center;
+            }
+
+            .appcard h3 {
+                margin: 0;
+                font-size: 16px;
+            }
+
+            .appcard .small {
+                margin-top: 11px;
+                line-height: 1.5;
+            }
+
+            .install {
+                margin-top: 18px;
+                height: 34px;
+                padding: 0 18px;
+                border-radius: 17px;
+                background: #8ab4f8;
+                color: #10284f;
+                font-weight: 600;
+                cursor: pointer;
+            }
+
+            .install:hover {
+                filter: brightness(1.08);
+            }
+
+            /* Settings */
+            #settingsWin {
+                left: 11%;
+                top: 6%;
+                width: 78%;
+                height: 80%;
+            }
+
+            .settings-shell {
+                display: grid;
+                grid-template-columns: 250px 1fr;
+                height: 100%;
+                background: var(--surface);
+            }
+
+            .settings-side {
+                background: var(--surface2);
+                border-right: 1px solid var(--line);
+                padding: 14px 10px;
+                overflow: auto;
+            }
+
+            .settings-search {
+                height: 40px;
+                border-radius: 20px;
+                background: var(--surface3);
+                display: flex;
+                align-items: center;
+                padding: 0 14px;
+                margin: 0 4px 13px;
+            }
+
+            .settings-search input {
+                border: 0;
+                outline: 0;
+                background: transparent;
+                flex: 1;
+            }
+
+            .setting-nav {
+                height: 40px;
+                border-radius: 20px;
+                padding: 0 14px;
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                cursor: pointer;
+            }
+
+            .setting-nav:hover {
+                background: var(--hover);
+            }
+
+            .setting-nav.sel {
+                background: #8ab4f820;
+                color: #aecbfa;
+            }
+
+            .settings-main {
+                overflow: auto;
+                padding: 30px 40px;
+            }
+
+            .settings-page {
+                display: none;
+                max-width: 760px;
+            }
+
+            .settings-page.active {
+                display: block;
+            }
+
+            .settings-page h1 {
+                font-size: 24px;
+                font-weight: 500;
+                margin: 0 0 22px;
+            }
+
+            .setting-card {
+                border: 1px solid var(--line);
+                border-radius: 16px;
+                background: var(--surface2);
+                overflow: hidden;
+                margin-bottom: 14px;
+            }
+
+            .setting-row {
+                min-height: 58px;
+                padding: 11px 16px;
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .setting-row:last-child {
+                border-bottom: 0;
+            }
+
+            .setting-row .grow {
+                flex: 1;
+            }
+
+            .setting-row b,
+            .setting-row span {
+                display: block;
+            }
+
+            .setting-row span {
+                font-size: 12px;
+                color: var(--muted);
+                margin-top: 3px;
+            }
+
+            .switch {
+                width: 38px;
+                height: 22px;
+                border-radius: 11px;
+                background: #5f6368;
+                position: relative;
+                cursor: pointer;
+            }
+
+            .switch::after {
+                content: "";
+                position: absolute;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #fff;
+                top: 3px;
+                left: 3px;
+                transition: 0.15s;
+            }
+
+            .switch.on {
+                background: #8ab4f8;
+            }
+
+            .switch.on::after {
+                left: 19px;
+                background: #174ea6;
+            }
+
+            .theme-choices {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 12px;
+            }
+
+            .theme-card {
+                height: 120px;
+                border-radius: 15px;
+                border: 2px solid transparent;
+                background: var(--surface2);
+                padding: 13px;
+                cursor: pointer;
+            }
+
+            .theme-card.selected {
+                border-color: #8ab4f8;
+            }
+
+            .theme-preview {
+                height: 62px;
+                border-radius: 9px;
+                margin-bottom: 9px;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .theme-preview.dark {
+                background: #202124;
+            }
+
+            .theme-preview.light {
+                background: #f1f3f4;
+            }
+
+            .theme-preview.auto {
+                background: linear-gradient(90deg, #f1f3f4 50%, #202124 50%);
+            }
+
+            .theme-preview::after {
+                content: "";
+                position: absolute;
+                left: 8px;
+                right: 8px;
+                bottom: 8px;
+                height: 12px;
+                border-radius: 6px;
+                background: #8ab4f8;
+            }
+
+            .wallpaper-picks {
+                display: flex;
+                gap: 11px;
+            }
+
+            .wallpick {
+                width: 128px;
+                height: 78px;
+                border-radius: 12px;
+                cursor: pointer;
+                border: 2px solid transparent;
+            }
+
+            .wallpick.selected {
+                border-color: #8ab4f8;
+            }
+
+            .wallpick.w1 {
+                background: radial-gradient(circle at 70% 40%, #2f67d3 0 24%, transparent 25%),
+                    radial-gradient(circle at 42% 44%, #7a3f56 0 30%, transparent 31%), #131931;
+            }
+
+            .wallpick.w2 {
+                background: radial-gradient(circle at 25% 60%, #0b7b83, #0f2631 55%, #101318);
+            }
+
+            .wallpick.w3 {
+                background: linear-gradient(135deg, #2d2244, #111827 52%, #17304f);
+            }
+
+            /* context + overview */
+            .contextmenu {
+                position: absolute;
+                z-index: 980;
+                min-width: 220px;
+                border-radius: 12px;
+                background: var(--surface);
+                box-shadow: var(--shadow);
+                padding: 6px;
+                display: none;
+                border: 1px solid var(--line);
+            }
+
+            .contextmenu.open {
+                display: block;
+            }
+
+            .contextitem {
+                height: 36px;
+                border-radius: 8px;
+                padding: 0 12px;
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+            }
+
+            .contextitem:hover {
+                background: var(--hover);
+            }
+
+            @media (max-width: 800px) {
+                .shelfbar {
+                    grid-template-columns: 70px 1fr 190px;
+                }
+
+                .shelf-left .label {
+                    display: none;
+                }
+
+                .launcher {
+                    width: calc(100vw - 24px);
+                }
+
+                .quick-panel {
+                    width: min(390px, calc(100vw - 24px));
+                }
+
+                .appgrid {
+                    grid-template-columns: repeat(4, 1fr);
+                }
+
+                .settings-shell {
+                    grid-template-columns: 190px 1fr;
+                }
+
+                .settings-main {
+                    padding: 24px;
+                }
+
+                .files-layout {
+                    grid-template-columns: 185px 1fr;
+                }
+
+                .win {
+                    min-width: 360px;
+                }
+            }
+
+            /* ===== V23 ChromeOS precision/refinement overrides ===== */
+            :root {
+                --shelf-h: 56px;
+            }
+
+            .shelfbar {
+                display: block;
+                padding: 0 8px;
+                height: var(--shelf-h);
+            }
+
+            .shelf-left {
+                position: absolute;
+                left: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+            }
+
+            .shelf-center {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 4px;
+                white-space: nowrap;
+            }
+
+            .shelf-tray {
+                position: absolute;
+                right: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+                height: 40px;
+                min-width: 0;
+                width: auto;
+                padding: 0 13px;
+            }
+
+            .shelf-app {
+                width: 44px;
+                height: 44px;
+                border-radius: 13px;
+            }
+
+            .shelf-app .app-icon {
+                width: 32px;
+                height: 32px;
+            }
+
+            .app-icon.terminal {
+                display: grid;
+                place-items: center;
+                border-radius: 50%;
+                background: #30343a;
+                color: #fff;
+                font:
+                    700 14px/1 ui-monospace,
+                    SFMono-Regular,
+                    Consolas,
+                    monospace;
+                text-align: center;
+                overflow: hidden;
+            }
+
+            .app-icon.terminal::before {
+                content: ">_";
+                display: block;
+                transform: translateY(-1px);
+            }
+
+            .app-icon.python,
+            .app-icon.minecraft,
+            .app-icon.ffmpeg,
+            .app-icon.vm,
+            .app-icon.godot {
+                background: transparent;
+                border-radius: 9px;
+                overflow: hidden;
+            }
+
+            .app-icon.python svg,
+            .app-icon.minecraft svg,
+            .app-icon.ffmpeg svg,
+            .app-icon.vm svg,
+            .app-icon.godot svg {
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+
+            .app-icon.code,
+            .app-icon.freecad,
+            .app-icon.audacity,
+            .app-icon.terraria,
+            .app-icon.openscad,
+            .app-icon.blender,
+            .app-icon.game {
+                border-radius: 9px;
+                color: #fff;
+                font:
+                    700 12px/1 Arial,
+                    sans-serif;
+            }
+
+            .app-icon.code {
+                background: #375a7f;
+            }
+
+            .app-icon.code::before {
+                content: "</>";
+            }
+
+            .app-icon.freecad {
+                background: #2f74c0;
+            }
+
+            .app-icon.freecad::before {
+                content: "FC";
+            }
+
+            .app-icon.audacity {
+                background: #fbbc04;
+                color: #202124;
+            }
+
+            .app-icon.audacity::before {
+                content: "A";
+            }
+
+            .app-icon.terraria {
+                background: linear-gradient(#65a844 0 45%, #7a5135 46%);
+            }
+
+            .app-icon.terraria::before {
+                content: "T";
+            }
+
+            .app-icon.openscad {
+                background: #f2c94c;
+                color: #202124;
+            }
+
+            .app-icon.openscad::before {
+                content: "SC";
+            }
+
+            .app-icon.blender {
+                background: #ea7600;
+            }
+
+            .app-icon.blender::before {
+                content: "B";
+            }
+
+            .app-icon.game {
+                background: #5f6368;
+            }
+
+            .app-icon.game::before {
+                content: "▶";
+            }
+
+            /* Chrome tab strip: plus button stays directly after the final tab, not at the far edge. */
+            .chrome-tabs {
+                height: 42px;
+                align-items: flex-end;
+                padding-left: 7px;
+            }
+
+            .tabs {
+                flex: 0 1 auto;
+                width: auto;
+                max-width: calc(100% - 190px);
+                height: 100%;
+                overflow: hidden;
+            }
+
+            .tab {
+                flex: 0 1 236px;
+                width: 236px;
+                min-width: 82px;
+                max-width: 236px;
+                height: 35px;
+                padding: 0 9px 0 11px;
+                gap: 7px;
+                border-radius: 9px 9px 0 0;
+            }
+
+            .newtabbtn {
+                flex: 0 0 32px;
+                width: 32px;
+                height: 32px;
+                margin: 0 4px 2px 4px;
+                display: grid;
+                place-items: center;
+                font-size: 0;
+            }
+
+            .newtabbtn svg {
+                width: 17px;
+                height: 17px;
+                pointer-events: none;
+            }
+
+            .chrome-window-controls {
+                margin-left: auto;
+                height: 42px;
+            }
+
+            .chrome-window-controls button {
+                height: 42px;
+            }
+
+            .chrome-toolbar {
+                height: 46px;
+                padding: 5px 8px 6px;
+                gap: 2px;
+            }
+
+            .navbtn {
+                width: 34px;
+                height: 34px;
+                font-size: 0;
+            }
+
+            .navbtn svg {
+                width: 19px;
+                height: 19px;
+                pointer-events: none;
+            }
+
+            .toolbar-action {
+                font-size: 0;
+            }
+
+            .toolbar-action svg {
+                width: 18px;
+                height: 18px;
+                pointer-events: none;
+            }
+
+            .site-chip {
+                font-size: 0;
+            }
+
+            .site-chip svg {
+                width: 18px;
+                height: 18px;
+            }
+
+            .omnibox-wrap {
+                height: 34px;
+                border-radius: 17px;
+            }
+
+            .omnibox {
+                font-size: 13px;
+            }
+
+            .chrome-frame {
+                border-radius: 10px;
+            }
+
+            /* Fix the enormous new-tab magnifier caused by intrinsic SVG sizing. */
+            .searchbox svg {
+                width: 20px !important;
+                height: 20px !important;
+                min-width: 20px;
+                max-width: 20px;
+                flex: 0 0 20px;
+                display: block;
+            }
+
+            .searchbox {
+                height: 46px;
+                gap: 12px;
+            }
+
+            .searchbox input {
+                min-width: 0;
+            }
+
+            .launch-search-wrap svg,
+            .settings-search svg {
+                width: 19px !important;
+                height: 19px !important;
+                min-width: 19px;
+                max-width: 19px;
+            }
+
+            .newtab {
+                padding-top: min(14vh, 112px);
+            }
+
+            .newtab-logo {
+                font-size: 50px;
+                margin-bottom: 30px;
+            }
+
+            /* Keep every movable window entirely inside the usable ChromeOS desktop. */
+            .win {
+                max-width: 100vw;
+                max-height: calc(100vh - var(--shelf-h));
+                overflow: hidden;
+            }
+
+            .win:not([data-max="1"]) {
+                min-width: min(440px, 100vw);
+                min-height: min(300px, calc(100vh - var(--shelf-h)));
+            }
+
+            /* OS mouse capture for the hosted browser. The synthetic cursor avoids the real browser edge UI. */
+            .capture-cursor {
+                position: fixed;
+                z-index: 20000;
+                width: 17px;
+                height: 23px;
+                display: none;
+                pointer-events: none;
+                transform: translate(-1px, -1px);
+                filter: drop-shadow(0 1px 1px #0008);
+            }
+
+            .capture-cursor::before {
+                content: "";
+                display: block;
+                width: 17px;
+                height: 23px;
+                background: no-repeat center/contain
+                    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 23'%3E%3Cpath d='M1 1v17l4.5-4 3.2 7 3-1.4-3.2-6.7H15z' fill='white' stroke='%23202124' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E");
+            }
+
+            .capture-hint {
+                position: absolute;
+                right: 12px;
+                top: 10px;
+                z-index: 20;
+                display: none;
+                align-items: center;
+                gap: 7px;
+                height: 28px;
+                padding: 0 11px;
+                border-radius: 14px;
+                background: #202124e8;
+                color: #e8eaed;
+                font-size: 11px;
+                box-shadow: 0 2px 10px #0007;
+                pointer-events: none;
+            }
+
+            .capture-hint.show {
+                display: flex;
+            }
+
+            body.os-captured,
+            body.os-captured * {
+                cursor: none !important;
+            }
+
+            body.os-captured .capture-cursor {
+                display: block;
+            }
+
+            /* More ChromeOS-like dynamic app windows and editor apps. */
+            .dynamic-app iframe {
+                min-height: 0;
+            }
+            .browser-content {
+                position: relative;
+                flex: 1 1 0;
+                width: 100%;
+                height: 100%;
+                min-width: 0;
+                min-height: 0;
+                overflow: hidden;
+                contain: none;
+            }
+
+            .gecko-canvas {
+                position: absolute;
+                inset: 0;
+
+                width: 100%;
+                height: 100%;
+
+                min-width: 0;
+                min-height: 0;
+                max-width: none;
+                max-height: none;
+
+                display: block;
+                margin: 0;
+                padding: 0;
+                border: 0;
+
+                background: #fff;
+                outline: none;
+
+                /* Normal browser mouse behavior */
+                touch-action: auto;
+                overscroll-behavior: auto;
+                cursor: default;
+            }
+
+            /* Kill the synthetic/captured cursor */
+            .capture-cursor,
+            .capture-hint {
+                display: none !important;
+            }
+            .app-titlebar {
+                height: 40px;
+            }
+
+            .window-controls button {
+                width: 44px;
+            }
+
+            .storebody {
+                padding: 22px 24px 28px;
+            }
+
+            .storehero {
+                height: 142px;
+                border-radius: 18px;
+            }
+
+            .storegrid {
+                grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+                gap: 12px;
+            }
+
+            .appcard {
+                min-height: 172px;
+                border-radius: 16px;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .appcard .small {
+                flex: 1;
+            }
+
+            .app-actions {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                margin-top: 16px;
+            }
+
+            .install {
+                margin-top: 0;
+            }
+
+            .install.secondary {
+                background: transparent;
+                border: 1px solid var(--line);
+                color: var(--ink);
+            }
+
+            .install:disabled {
+                opacity: 0.58;
+                cursor: default;
+            }
+
+            .download-note {
+                font-size: 11px;
+                color: var(--muted);
+                margin-top: 7px;
+            }
+
+            /* Accessibility settings actually affect the shell. */
+            :root.large-cursor * {
+                cursor: default !important;
+            }
+
+            :root.large-cursor button,
+            :root.large-cursor a,
+            :root.large-cursor [onclick] {
+                cursor: pointer !important;
+            }
+
+            :root.reduce-motion * {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+                scroll-behavior: auto !important;
+            }
+
+            @media (max-width: 760px) {
+                .shelf-center {
+                    gap: 0;
+                }
+
+                .shelf-app {
+                    width: 40px;
+                }
+
+                .shelf-tray .battery {
+                    display: none;
+                }
+
+                .tray-date {
+                    min-width: 58px;
+                }
+
+                .launcher {
+                    left: 8px;
+                    width: calc(100vw - 16px);
+                }
+
+                .quick-panel {
+                    right: 8px;
+                    width: min(390px, calc(100vw - 16px));
+                }
+
+                .settings-shell {
+                    grid-template-columns: 210px 1fr;
+                }
+
+                .settings-main {
+                    padding: 24px;
+                }
+
+                .files-layout {
+                    grid-template-columns: 185px 1fr;
+                }
+            }
+        
+
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#202124}
+#browserWin{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;
+ min-width:0!important;min-height:0!important;display:flex!important;flex-direction:column!important;
+ border:0!important;border-radius:0!important;resize:none!important;overflow:hidden!important}
+.chrome-frame{background:#202124}
+.chrome-tabs{display:flex;align-items:stretch}
+.tabs{min-width:0;flex:1}
+.browser-inline-controls{position:static!important;margin-left:auto;height:100%;display:flex!important;align-items:stretch;flex:0 0 auto}
+.browser-inline-controls button{height:100%!important;min-height:0!important;border-radius:0!important}
+.browser-inline-controls .close{font-size:18px;line-height:1}
+</style>
+
+<style id="u8-browser-final-fixes">
+#browserTabStrip{
+    height:44px!important;
+    min-height:44px!important;
+    display:flex!important;
+    align-items:flex-end!important;
+    padding:0 0 0 8px!important;
+    overflow:hidden!important;
+}
+#browserTabStrip .tabs{
+    display:flex!important;
+    align-items:flex-end!important;
+    flex:0 1 auto!important;
+    width:auto!important;
+    min-width:0!important;
+    max-width:calc(100% - 178px)!important;
+    height:44px!important;
+    overflow:hidden!important;
+}
+#browserTabStrip .tab{
+    flex:0 1 240px!important;
+    min-width:95px!important;
+}
+#browserTabStrip .newtabbtn{
+    box-sizing:border-box!important;
+    flex:0 0 34px!important;
+    width:34px!important;
+    height:34px!important;
+    margin:0 auto 1px 4px!important;
+    padding:0!important;
+    align-self:flex-end!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    border-radius:50%!important;
+    transform:none!important;
+}
+#browserTabStrip .newtabbtn svg{
+    display:block!important;
+    width:18px!important;
+    height:18px!important;
+    margin:0!important;
+    fill:none!important;
+    stroke:currentColor!important;
+    stroke-width:2!important;
+    stroke-linecap:round!important;
+}
+.browser-window-controls{
+    flex:0 0 138px!important;
+    width:138px!important;
+    height:44px!important;
+    margin-left:auto!important;
+    align-self:stretch!important;
+    display:flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:relative!important;
+    z-index:100!important;
+}
+.browser-window-controls button{
+    flex:0 0 46px!important;
+    width:46px!important;
+    height:44px!important;
+    padding:0!important;
+    margin:0!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    color:#e8eaed!important;
+    background:transparent!important;
+    visibility:visible!important;
+    opacity:1!important;
+    cursor:pointer!important;
+    border-radius:0!important;
+}
+.browser-window-controls button:hover{background:#ffffff16!important}
+.browser-window-controls .browser-close:hover{background:#c42b1c!important}
+.browser-window-controls svg{
+    width:12px!important;
+    height:12px!important;
+    display:block!important;
+    fill:none!important;
+    stroke:currentColor!important;
+    stroke-width:1.2!important;
+}
+.tab-favicon{
+    width:16px!important;
+    height:16px!important;
+    flex:0 0 16px!important;
+    border-radius:3px!important;
+    background-size:16px 16px!important;
+    background-position:center!important;
+    background-repeat:no-repeat!important;
+}
+.tab-favicon.has-icon{
+    background-color:transparent!important;
+    background-image:var(--favicon)!important;
+}
+.tab-favicon.has-icon::after{display:none!important}
+
+.browser-popover{position:fixed;z-index:30000;min-width:260px;max-width:min(360px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;background:#292a2d;color:#e8eaed;border:1px solid #4a4d51;border-radius:12px;box-shadow:0 12px 40px #0009;padding:6px;display:none;font:13px/1.35 Arial,sans-serif}.browser-popover.open{display:block}.browser-menu-item{width:100%;height:36px;padding:0 12px;border-radius:7px;display:flex;align-items:center;gap:10px;text-align:left;cursor:pointer}.browser-menu-item:hover{background:#ffffff12}.browser-menu-item small{margin-left:auto;color:#9aa0a6}.browser-menu-sep{height:1px;background:#3c4043;margin:5px 4px}.browser-popover h3{font-size:13px;margin:8px 10px}.browser-popover p{font-size:12px;color:#bdc1c6;margin:8px 10px;line-height:1.5}.browser-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:31000;background:#303134;color:#fff;border:1px solid #5f6368;border-radius:8px;padding:10px 14px;box-shadow:0 8px 30px #0008;display:none;max-width:70vw}.browser-toast.show{display:block}.site-chip{border:0;background:transparent;cursor:pointer}.bookmark-on svg{fill:#8ab4f8!important;stroke:#8ab4f8!important}
+</style>
+
+</head>
+<body>
+<div id="browserWin" class="chrome-frame">
+                <div class="chrome-tabs dragbar" id="browserTabStrip">
+                    <div id="tabs" class="tabs"></div>
+                    <button class="newtabbtn" title="New tab" aria-label="New tab" onclick="newTab()">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 5v14M5 12h14"></path>
+                        </svg>
+                    </button>
+                    <div class="browser-window-controls" aria-label="Window controls">
+                        <button class="browser-min" title="Minimize" aria-label="Minimize"
+                            onclick="browserWindowAction('minimize')">
+                            <svg viewBox="0 0 12 12"><path d="M1 9.5h10"></path></svg>
+                        </button>
+                        <button class="browser-max" title="Maximize or restore" aria-label="Maximize or restore"
+                            onclick="browserWindowAction('maximize')">
+                            <svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"></rect></svg>
+                        </button>
+                        <button class="browser-close" title="Close" aria-label="Close"
+                            onclick="browserWindowAction('close')">
+                            <svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="chrome-toolbar">
+                    <button id="back" class="navbtn" title="Back" onclick="hist(-1)">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="m14.5 5-7 7 7 7" />
+                        </svg></button
+                    ><button id="forward" class="navbtn" title="Forward" onclick="hist(1)">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="m9.5 5 7 7-7 7" />
+                        </svg></button
+                    ><button class="navbtn" title="Reload" onclick="reloadPage()">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.9"
+                            stroke-linecap="round"
+                        >
+                            <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+                            <path d="M20 5v6h-6" />
+                        </svg>
+                    </button>
+                    <div class="omnibox-wrap">
+                        <button id="siteControlsBtn" class="site-chip" title="Site controls" type="button"
+                            ><svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                            >
+                                <path d="M7 8h10M7 16h10" />
+                                <circle cx="9" cy="8" r="1.6" fill="currentColor" />
+                                <circle cx="15" cy="16" r="1.6" fill="currentColor" /></svg></button
+                        ><input id="omnibox" class="omnibox" autocomplete="off" spellcheck="false" /><button
+                            id="bookmarkBtn" class="toolbar-action"
+                            title="Bookmark this tab"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linejoin="round"
+                            >
+                                <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <button id="profileBtn" class="toolbar-action" title="Downloads" aria-label="Downloads">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3v11" />
+                            <path d="m7.5 10 4.5 4.5 4.5-4.5" />
+                            <path d="M5 19h14" />
+                        </svg></button
+                    ><button id="browserMenuBtn" class="toolbar-action" title="Customize and control Chrome">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="5" r="1.5" />
+                            <circle cx="12" cy="12" r="1.5" />
+                            <circle cx="12" cy="19" r="1.5" />
+                        </svg>
+                    </button>
+                </div>
+                <div id="browserPopover" class="browser-popover" role="menu"></div>
+                <div id="browserToast" class="browser-toast" role="status"></div>
+                <div id="browserContent" class="browser-content">
+                    <div id="pageLoad" class="page-load"></div>
+                    <canvas id="gecko" class="gecko-canvas" tabindex="0"></canvas>
+                    <div id="newtab" class="newtab">
+                        <div class="newtab-logo"><span class="u8">Unlim8ted</span></div>
+                        <div class="searchbox">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="6.5" />
+                                <path d="m16 16 4 4" /></svg
+                            ><input id="ntsearch" placeholder="Search Google or type a URL" />
+                        </div>
+                        <div class="shortcuts">
+                            <div class="shortcut" onclick="go('https://www.google.com/')"><i>G</i>Google</div>
+                            <div class="shortcut" onclick="go('https://en.wikipedia.org/')"><i>W</i>Wikipedia</div>
+                            <div class="shortcut" onclick="go('https://github.com/')"><i>⌘</i>GitHub</div>
+                            <div class="shortcut" onclick="go('https://unlim8ted.com/')"><i>∞</i>Unlim8ted</div>
+                        </div>
+                    </div>
+                    <div id="bootstate" class="bootstate">
+                        <div class="bootcard">
+                            <h2 id="bootTitle">Starting Gecko</h2>
+                            <div class="progress"><span id="bootbar"></span></div>
+                            <div id="bootmsg" class="small bootmsg">Preparing browser engine…</div>
+                            <div id="booterr" class="error"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+<script>
+
+const RESOURCE_URLS = {
+  geckoJs: "./gecko.js",
+  geckoWasm: "./gecko.wasm"
+};
+let effectiveTheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+// Window chrome is rendered in the tab strip; the shell only performs the action.
+function browserWindowAction(action){
+  parent.postMessage({type:"unlim8ted-browser-window-"+action},"*");
+}
+
+// Pointer-lock policy: do not proactively capture the mouse.
+// There is deliberately no requestPointerLock() here; a site must request pointer lock
+// through Gecko/content itself before the browser can enter captured-pointer mode.
+// Parent-shell RPC. This is the only file path used by browser open/save.
+let rpcSeq = 1;
+const rpcWait = new Map();
+const VFS_DB="unlim8ted-browser-vfs", VFS_STORE="files";
+function vfsDB(){return new Promise((resolve,reject)=>{const q=indexedDB.open(VFS_DB,1);q.onupgradeneeded=()=>{const db=q.result;if(!db.objectStoreNames.contains(VFS_STORE))db.createObjectStore(VFS_STORE,{keyPath:"path"})};q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})}
+async function vfsPut(path,bytes,mime="application/octet-stream"){const db=await vfsDB();return new Promise((resolve,reject)=>{const tx=db.transaction(VFS_STORE,"readwrite");tx.objectStore(VFS_STORE).put({path,bytes:Array.from(bytes||[]),mime,modified:Date.now()});tx.oncomplete=()=>resolve({ok:true,path});tx.onerror=()=>reject(tx.error)})}
+async function vfsGet(path){const db=await vfsDB();return new Promise((resolve,reject)=>{const q=db.transaction(VFS_STORE).objectStore(VFS_STORE).get(path);q.onsuccess=()=>q.result?resolve(q.result):reject(Error("File not found: "+path));q.onerror=()=>reject(q.error)})}
+async function vfsList(dir="/home/user"){const db=await vfsDB();return new Promise((resolve,reject)=>{const q=db.transaction(VFS_STORE).objectStore(VFS_STORE).getAll();q.onsuccess=()=>{const prefix=dir.replace(/\/$/,"")+"/",seen=new Map();for(const f of q.result){if(!f.path.startsWith(prefix))continue;const rest=f.path.slice(prefix.length);if(!rest)continue;const part=rest.split("/")[0],folder=rest.includes("/");if(!seen.has(part))seen.set(part,folder?{name:part,path:prefix+part,type:"directory",size:0,modified:f.modified}:{name:part,path:f.path,type:"file",size:(f.bytes||[]).length,modified:f.modified,mime:f.mime})}resolve([...seen.values()])};q.onerror=()=>reject(q.error)})}
+function uniqueVFSPath(dir,name){name=(name||"download").replace(/[\\/:*?"<>|]+/g,"_");return (async()=>{let p=dir.replace(/\/$/,"")+"/"+name,n=1,dot=name.lastIndexOf("."),base=dot>0?name.slice(0,dot):name,ext=dot>0?name.slice(dot):"";for(;;){try{await vfsGet(p);p=dir.replace(/\/$/,"")+`/${base} (${n++})${ext}`}catch{return p}}})()}
+async function localVFSRPC(type,payload={}){
+  if(type==="unlim8ted-browser-fs-list") return {ok:true,entries:await vfsList(payload.path||"/home/user")};
+  if(type==="unlim8ted-browser-fs-read"){const f=await vfsGet(payload.path);return {ok:true,path:f.path,bytes:f.bytes,mime:f.mime,modified:f.modified}}
+  if(type==="unlim8ted-browser-fs-write"){await vfsPut(payload.path,new Uint8Array(payload.bytes||[]),payload.mime||"application/octet-stream");return {ok:true,path:payload.path}}
+  if(type==="unlim8ted-browser-fs-save-path") return {ok:true,path:await uniqueVFSPath(payload.directory||"/home/user/Downloads",payload.suggested||"download")};
+  if(type==="unlim8ted-browser-fs-pick"){const files=await vfsList(payload.path||"/home/user");const choices=files.filter(x=>x.type==="file");if(!choices.length)return {ok:true,path:""};const answer=await chooseFilePopup(choices,payload.path||"/home/user");if(!answer)return {ok:true,path:""};return {ok:true,path:answer}}
+  throw Error("Unsupported VFS operation: "+type);
+}
+function shellRPC(type, payload={}) {
+  if(parent===window && type.startsWith("unlim8ted-browser-fs-")) return localVFSRPC(type,payload);
+  return new Promise((resolve,reject)=>{
+    const id = "browser-rpc-" + (rpcSeq++);
+    const fallback = type.startsWith("unlim8ted-browser-fs-");
+    rpcWait.set(id,{resolve,reject});
+    parent.postMessage({type,id,...payload},"*");
+    setTimeout(async()=>{if(!rpcWait.has(id))return;rpcWait.delete(id);if(fallback){try{return resolve(await localVFSRPC(type,payload))}catch(e){return reject(e)}}reject(Error("Shell filesystem request timed out"))},1200);
+  });
+}
+addEventListener("message",e=>{
+  const d=e.data||{};
+  if(d.type==="unlim8ted-browser-rpc-result" && rpcWait.has(d.id)){
+    const w=rpcWait.get(d.id); rpcWait.delete(d.id);
+    d.ok ? w.resolve(d) : w.reject(Error(d.error||"Filesystem request failed"));
+  }
+  if(d.type==="unlim8ted-browser-ensure-tab") {
+    
+// Blank tab-strip space is the browser window drag surface.
+let shellDrag = null;
+const chromeTabs = document.getElementById("browserTabStrip");
+chromeTabs.addEventListener("pointerdown", e => {
+    if (e.button !== 0 || e.target.closest("button,.tab,input,select,textarea")) return;
+    shellDrag = { id:e.pointerId };
+    try { chromeTabs.setPointerCapture(e.pointerId); } catch {}
+    parent.postMessage({type:"unlim8ted-browser-drag-start",x:e.clientX,y:e.clientY},"*");
+    e.preventDefault();
+});
+chromeTabs.addEventListener("pointermove", e => {
+    if (!shellDrag || e.pointerId !== shellDrag.id) return;
+    parent.postMessage({type:"unlim8ted-browser-drag-move",x:e.clientX,y:e.clientY},"*");
+});
+function finishShellDrag(e){
+    if (!shellDrag || (e.pointerId != null && e.pointerId !== shellDrag.id)) return;
+    parent.postMessage({type:"unlim8ted-browser-drag-end"},"*");
+    shellDrag = null;
+}
+chromeTabs.addEventListener("pointerup", finishShellDrag);
+chromeTabs.addEventListener("pointercancel", finishShellDrag);
+
+if (!tabs.length) newTab();
+  }
+  if(d.type==="unlim8ted-browser-resize") {
+    window.Unlim8tedBrowser?.resize(d.width,d.height,d.dpr);
+  }
+});
+
+// Exposed browser integration API. Parent can call resize through postMessage;
+// Gecko receives the real CSS viewport size, while the canvas backing store is DPR-scaled.
+const browserContent = document.getElementById("browserContent") || document.querySelector(".browser-content");
+let resizeRAF = 0;
+async function resizeGeckoCanvas(width, height, dpr = devicePixelRatio || 1) {
+  if(!canvas || !browserContent) return;
+  const r = browserContent.getBoundingClientRect();
+  const cssWidth = Math.max(1, Math.floor(width || r.width));
+  const cssHeight = Math.max(1, Math.floor(height || r.height));
+  canvas.style.width = cssWidth + "px";
+  canvas.style.height = cssHeight + "px";
+  const pw = Math.max(1, Math.floor(cssWidth*dpr));
+  const ph = Math.max(1, Math.floor(cssHeight*dpr));
+  if(canvas.width !== pw) canvas.width = pw;
+  if(canvas.height !== ph) canvas.height = ph;
+  if(geckoReady && gecko?.resize) {
+    try { await gecko.resize(cssWidth, cssHeight, dpr); }
+    catch { try { await gecko.resize(cssWidth, cssHeight); } catch {} }
+  }
+}
+function scheduleBrowserResize(){
+  cancelAnimationFrame(resizeRAF);
+  resizeRAF=requestAnimationFrame(()=>resizeGeckoCanvas());
+}
+window.Unlim8tedBrowser = {
+  resize: resizeGeckoCanvas,
+  fs: {
+    list: path => shellRPC("unlim8ted-browser-fs-list",{path}),
+    read: path => shellRPC("unlim8ted-browser-fs-read",{path}),
+    write: (path,bytes) => shellRPC("unlim8ted-browser-fs-write",{path,bytes:Array.from(bytes||[])})
+  }
+};
+new ResizeObserver(scheduleBrowserResize).observe(browserContent);
+addEventListener("resize",scheduleBrowserResize);
+
+// Virtual-filesystem picker used by browser Open.
+async function chooseVirtualFile(base="/home/user"){
+  const result = await shellRPC("unlim8ted-browser-fs-pick",{path:base});
+  return result.path || "";
+}
+async function openVirtualFile(){
+  const path = await chooseVirtualFile("/home/user");
+  if(!path) return;
+  const r = await shellRPC("unlim8ted-browser-fs-read",{path});
+  const bytes = new Uint8Array(r.bytes||[]);
+  const name = path.split("/").pop() || "file";
+  const mime = r.mime || (name.endsWith(".html")?"text/html":name.endsWith(".txt")?"text/plain":"application/octet-stream");
+  const url = URL.createObjectURL(new Blob([bytes],{type:mime}));
+  if(active < 0) newTab();
+  tabs[active].title=name;
+  tabs[active].url=url;
+  tabs[active].hist.push(url);
+  tabs[active].hi=tabs[active].hist.length-1;
+  renderTabs();
+  await loadUrl(url);
+}
+
+// Browser Save writes into the same IndexedDB VFS through the parent shell.
+async function saveCurrentToVirtualFS(){
+  if(!geckoReady) return;
+  let page = "";
+  try {
+    page = await gecko.evalChrome(`(()=>{try{let w=document.commandDispatcher?.focusedWindow||window.content,d=w?.document;return d?.documentElement?.outerHTML||''}catch(e){return ''}})()`);
+    if(typeof page==="string" && page.startsWith('"')) { try{ page=JSON.parse(page); }catch{} }
+  } catch {}
+  if(!page) throw Error("Could not read the current page");
+  const t=tabs[active]||{};
+  let suggested=(t.title||"page").replace(/[\\/:*?"<>|]+/g,"_").trim()||"page";
+  if(!/\.[a-z0-9]{1,8}$/i.test(suggested)) suggested += ".html";
+  const target = await shellRPC("unlim8ted-browser-fs-save-path",{directory:"/home/user/Downloads",suggested});
+  if(!target.path) return;
+  await shellRPC("unlim8ted-browser-fs-write",{path:target.path,bytes:Array.from(new TextEncoder().encode(page))});
+}
+addEventListener("keydown",e=>{
+  if(e.ctrlKey && !e.shiftKey && e.key.toLowerCase()==="o"){
+    e.preventDefault(); openVirtualFile().catch(err=>notify(err.message));
+  }
+  if(e.ctrlKey && !e.shiftKey && e.key.toLowerCase()==="s"){
+    e.preventDefault(); saveCurrentToVirtualFS().catch(err=>notify(err.message));
+  }
+});
+
+// Browser: one Gecko instance for the whole Chrome-style app.
+            let GeckoClass = null,
+                gecko = null,
+                geckoReady = false,
+                geckoStarting = null,
+                tabs = [],
+                active = -1,
+                watcher = null,
+                loadedUrl = "";
+            const canvas = document.getElementById("gecko"),
+                newtabEl = document.getElementById("newtab"),
+                boot = document.getElementById("bootstate"),
+                pageLoad = document.getElementById("pageLoad");
+            function setBoot(p, msg, title = "Starting Gecko") {
+                boot.style.display = "grid";
+                document.getElementById("bootTitle").textContent = title;
+                document.getElementById("bootbar").style.width = p + "%";
+                document.getElementById("bootmsg").textContent = msg;
+                document.getElementById("booterr").textContent = "";
+            }
+            async function ensureGecko() {
+                if (geckoReady) return gecko;
+                if (geckoStarting) return geckoStarting;
+                geckoStarting = (async () => {
+                    if (!crossOriginIsolated)
+                        throw Error(
+                            "crossOriginIsolated is false. This page needs COOP: same-origin and COEP: require-corp."
+                        );
+                    setBoot(6, "Loading browser engine…");
+                    let mod = await import(RESOURCE_URLS.geckoJs);
+                    GeckoClass = mod.Gecko;
+                    setBoot(20, "Preparing Gecko WASM…");
+                    let wasm = RESOURCE_URLS.geckoWasm;
+                    setBoot(36, "Creating Gecko runtime…");
+                    let env = {
+                        GECKO_GPU: "1",
+                        GECKO_GL_PASSTHROUGH: "1",
+                        GECKO_WR_DIRECT: "1",
+                        GECKO_APZ: "1",
+                        GECKO_NOWASMJIT: "1",
+                        GECKO_DARK: effectiveTheme === "dark" ? "1" : "0",
+                    };
+                    gecko = new GeckoClass({
+                        canvas,
+                        width: Math.max(640, canvas.clientWidth),
+                        height: Math.max(400, canvas.clientHeight),
+                        wasm: { url: wasm, compressed: true },
+                        profile: "unlim8ted-gecko-profile",
+                        wispUrl: "wss://wisp.mercurywork.shop/",
+                        env,
+                        print: (x) => console.log("[gecko]", x),
+                        printErr: (x) => console.warn("[gecko]", x),
+                    });
+                    setBoot(48, "Decompressing Gecko…");
+                    await gecko.init();
+                    setBoot(94, "Finishing startup…");
+                    geckoReady = true;
+                    geckoStarting = null;
+                    boot.style.display = "none";
+                    canvas.style.display = "block";
+                    startWatch();
+                    return gecko;
+                })().catch((e) => {
+                    geckoStarting = null;
+                    document.getElementById("booterr").textContent = e.stack || e;
+                    document.getElementById("bootTitle").textContent = "Gecko failed to start";
+                    throw e;
+                });
+                return geckoStarting;
+            }
+            function newTab() {
+                tabs.push({ title: "New Tab", icon: "", url: "unlim8ted://newtab", hist: ["unlim8ted://newtab"], hi: 0 });
+                active = tabs.length - 1;
+                renderTabs();
+                showTab();
+            }
+            function closeTab(i, e) {
+                e?.preventDefault?.();
+                e?.stopPropagation?.();
+                if (i < 0 || i >= tabs.length) return;
+                tabs.splice(i, 1);
+                if (!tabs.length) {
+                    active = -1;
+                    renderTabs();
+                    browserWindowAction("close");
+                    return;
+                }
+                if (i < active) active--;
+                else if (active >= tabs.length) active = tabs.length - 1;
+                renderTabs();
+                showTab();
+            }
+            function renderTabs() {
+                document.getElementById("tabs").innerHTML = tabs.map((t, i) => {
+                    const icon = t.icon
+                        ? ` has-icon" style="--favicon:url('${esc(String(t.icon).replace(/'/g, "%27"))}')`
+                        : `"`;
+                    return `<div class="tab ${i === active ? "active" : ""}" data-tab-index="${i}"
+                        onclick="switchTab(${i})" onauxclick="tabAuxClick(event,${i})">
+                        <span class="tab-favicon${icon}></span>
+                        <span class="txt">${esc(t.title || "New Tab")}</span>
+                        <span class="tab-x" onclick="closeTab(${i},event)">×</span>
+                    </div>`;
+                }).join("");
+                updateNav();
+            }
+            function tabAuxClick(e, i) {
+                if (e.button === 1) closeTab(i, e);
+            }
+
+            // Three-finger tap on a tab closes that tab. Track touch pointers only;
+            // normal mouse/pen behavior is untouched.
+            const tabTouches = new Map();
+            let threeFingerCandidate = null;
+            document.getElementById("tabs").addEventListener("pointerdown", e => {
+                if (e.pointerType !== "touch") return;
+                const tab = e.target.closest(".tab");
+                if (!tab) return;
+                tabTouches.set(e.pointerId, {x:e.clientX,y:e.clientY,tab});
+                if (tabTouches.size === 3) {
+                    const vals=[...tabTouches.values()];
+                    if (vals.every(v=>v.tab===vals[0].tab)) threeFingerCandidate=vals[0].tab;
+                }
+            });
+            document.getElementById("tabs").addEventListener("pointermove", e => {
+                const p=tabTouches.get(e.pointerId);
+                if(!p) return;
+                if(Math.hypot(e.clientX-p.x,e.clientY-p.y)>18) threeFingerCandidate=null;
+            });
+            function finishTabTouch(e){
+                const candidate=threeFingerCandidate;
+                tabTouches.delete(e.pointerId);
+                if(candidate && tabTouches.size===0){
+                    threeFingerCandidate=null;
+                    const i=Number(candidate.dataset.tabIndex);
+                    if(Number.isInteger(i)) closeTab(i,e);
+                }
+                if(tabTouches.size===0) threeFingerCandidate=null;
+            }
+            document.getElementById("tabs").addEventListener("pointerup", finishTabTouch);
+            document.getElementById("tabs").addEventListener("pointercancel", finishTabTouch);
+
+            addEventListener("keydown", e => {
+                if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase()==="w") {
+                    e.preventDefault();
+                    if (active >= 0) closeTab(active, e);
+                }
+            });
+
+            function switchTab(i) {
+                active = i;
+                renderTabs();
+                showTab();
+            }
+            async function showTab() {
+                let t = tabs[active];
+                if (!t) return;
+                document.getElementById("omnibox").value = t.url === "unlim8ted://newtab" ? "" : t.url;
+                if (t.url === "unlim8ted://newtab") {
+                    newtabEl.style.display = "flex";
+                    canvas.style.display = "none";
+                    boot.style.display = "none";
+                    loadedUrl = "";
+                } else {
+                    newtabEl.style.display = "none";
+                    if (t.url !== loadedUrl) await loadUrl(t.url);
+                }
+                updateNav();
+            }
+            function normalize(s) {
+                s = s.trim();
+                if (!s) return "unlim8ted://newtab";
+                if (/^https?:\/\//i.test(s)) return s;
+                if (s.includes(".") && !s.includes(" ")) return "https://" + s;
+                return "https://www.google.com/search?q=" + encodeURIComponent(s);
+            }
+            async function go(s, push = true) {
+                if (active < 0) newTab();
+                let u = normalize(s),
+                    t = tabs[active];
+                if (push) {
+                    t.hist = t.hist.slice(0, t.hi + 1);
+                    t.hist.push(u);
+                    t.hi = t.hist.length - 1;
+                }
+                t.url = u;
+                t.title = "Loading…";
+                renderTabs();
+                document.getElementById("omnibox").value = u;
+                newtabEl.style.display = "none";
+                await loadUrl(u);
+            }
+            async function loadUrl(u) {
+                pageLoad.style.display = "block";
+                try {
+                    let g = await ensureGecko();
+                    resizeGeckoCanvas();
+                    canvas.style.display = "block";
+                    boot.style.display = "none";
+                    await g.resize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
+                    await g.load(u);
+                    loadedUrl = u;
+                    canvas.focus();
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    setTimeout(() => (pageLoad.style.display = "none"), 300);
+                }
+            }
+            function hist(d) {
+                let t = tabs[active];
+                if (!t) return;
+                let n = t.hi + d;
+                if (n < 0 || n >= t.hist.length) return;
+                t.hi = n;
+                t.url = t.hist[n];
+                renderTabs();
+                showTab();
+            }
+            function reloadPage() {
+                let t = tabs[active];
+                if (t && t.url !== "unlim8ted://newtab") loadUrl(t.url);
+            }
+            function updateNav() {
+                let t = tabs[active];
+                document.getElementById("back").disabled = !t || t.hi <= 0;
+                document.getElementById("forward").disabled = !t || t.hi >= t.hist.length - 1;
+            }
+            const omniboxEl=document.getElementById("omnibox");
+            let omniboxEditing=false;
+            omniboxEl.addEventListener("focus",()=>{omniboxEditing=true; omniboxEl.select()});
+            omniboxEl.addEventListener("blur",()=>{omniboxEditing=false; const t=tabs[active]; if(t) omniboxEl.value=t.url==="unlim8ted://newtab"?"":t.url});
+            omniboxEl.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") { omniboxEditing=false; go(e.target.value); e.target.blur(); }
+                else if(e.key === "Escape") { const t=tabs[active]; e.target.value=t?.url==="unlim8ted://newtab"?"":(t?.url||""); e.target.blur(); }
+            });
+            document.getElementById("ntsearch").addEventListener("keydown", (e) => {
+                if (e.key === "Enter") go(e.target.value);
+            });
+            function startWatch() {
+                clearInterval(watcher);
+                watcher = setInterval(async () => {
+                    if (!geckoReady || active < 0) return;
+                    try {
+                        let r = await gecko.evalChrome(
+                            `(()=>{try{let w=document.commandDispatcher?.focusedWindow||window.content,d=w?.document,icon=d?.querySelector('link[rel~="icon"]')?.href||'';return JSON.stringify({title:d?.title||'',url:d?.location?.href||'',icon})}catch(e){return ''}})()`
+                        );
+                        if (typeof r === "string" && r.startsWith('"'))
+                            try {
+                                r = JSON.parse(r);
+                            } catch {}
+                        if (typeof r === "string" && r.startsWith("{")) {
+                            let o = JSON.parse(r),
+                                t = tabs[active];
+                            let changed = false;
+                            if (o.title && o.title !== t.title) { t.title = o.title; changed = true; }
+                            if ((o.icon || "") !== (t.icon || "")) { t.icon = o.icon || ""; changed = true; }
+                            if (o.url && /^https?:/.test(o.url) && o.url !== t.url) {
+                                t.url = o.url;
+                                loadedUrl = o.url;
+                                changed = true;
+                            }
+                            if (changed) renderTabs();
+                            if(!omniboxEditing) document.getElementById("omnibox").value = t.url;
+                        }
+                    } catch {}
+                }, 1800);
+            }
+            
+
+// Functional browser chrome: bookmarks, site info, menu, downloads and lightweight user-script extensions.
+const bookmarks = JSON.parse(localStorage.getItem("u8-bookmarks")||"[]");
+const extensions = JSON.parse(localStorage.getItem("u8-extensions")||"[]");
+const popover=document.getElementById("browserPopover"), toast=document.getElementById("browserToast");
+function notify(msg){toast.textContent=msg;toast.classList.add("show");clearTimeout(notify.t);notify.t=setTimeout(()=>toast.classList.remove("show"),2400)}
+function closePopover(){popover.classList.remove("open")}
+function chooseFilePopup(files,base){
+  return new Promise(resolve=>{
+    const anchor=document.getElementById("browserMenuBtn")||document.getElementById("siteControlsBtn");
+    const finish=v=>{closePopover();resolve(v||"")};
+    popover._pickerFinish=finish;
+    const rows=files.length?files.map((f,i)=>`<button class="browser-menu-item" data-pick="${i}"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span></button>`).join(""):'<p>No files found in this folder.</p>';
+    showPopover(anchor,`<h3>Open file</h3><p>${esc(base)}</p>${rows}<div class="browser-menu-sep"></div><button class="browser-menu-item" data-cancel>Cancel</button>`);
+    popover.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>finish(files[+b.dataset.pick].path));
+    popover.querySelector("[data-cancel]").onclick=()=>finish("");
+  });
+}
+function showPopover(anchor,html){
+  popover.innerHTML=html; popover.classList.add("open");
+  popover.style.visibility="hidden"; popover.style.left="auto"; popover.style.right="auto";
+  const r=anchor.getBoundingClientRect(), w=popover.offsetWidth, h=popover.offsetHeight, pad=8;
+  let left=Math.min(Math.max(pad,r.right-w),innerWidth-w-pad);
+  let top=r.bottom+6; if(top+h>innerHeight-pad) top=Math.max(pad,r.top-h-6);
+  popover.style.left=left+"px"; popover.style.top=Math.max(pad,top)+"px"; popover.style.visibility="visible";
+}
+addEventListener("pointerdown",e=>{if(!popover.contains(e.target)&&!e.target.closest("#browserMenuBtn,#profileBtn,#siteControlsBtn"))closePopover()});
+function currentTab(){return tabs[active]||null}
+function saveBookmarks(){localStorage.setItem("u8-bookmarks",JSON.stringify(bookmarks));syncBookmark()}
+function toggleBookmark(){const t=currentTab();if(!t||t.url==="unlim8ted://newtab")return;const i=bookmarks.findIndex(b=>b.url===t.url);if(i>=0){bookmarks.splice(i,1);notify("Bookmark removed")}else{bookmarks.push({title:t.title||t.url,url:t.url});notify("Bookmark added")}saveBookmarks()}
+function syncBookmark(){const t=currentTab(),b=document.getElementById("bookmarkBtn");b?.classList.toggle("bookmark-on",!!t&&bookmarks.some(x=>x.url===t.url))}
+function openBookmark(i){const b=bookmarks[i];if(!b)return;closePopover();go(b.url)}
+function deleteBookmark(i){if(!bookmarks[i])return;bookmarks.splice(i,1);saveBookmarks();showBookmarkManager();notify("Bookmark deleted")}
+function editBookmark(i){const b=bookmarks[i];if(!b)return;showPopover(document.getElementById("browserMenuBtn"),`<h3>Edit bookmark</h3><div style="padding:4px 10px 10px"><label class="small">Name</label><input id="bmEditTitle" style="width:100%;height:34px;margin:5px 0 10px;padding:0 10px;border:1px solid #5f6368;border-radius:7px;background:#202124;color:#e8eaed;outline:none" value="${esc(b.title||b.url)}"><label class="small">Address</label><input id="bmEditUrl" style="width:100%;height:34px;margin:5px 0 10px;padding:0 10px;border:1px solid #5f6368;border-radius:7px;background:#202124;color:#e8eaed;outline:none" value="${esc(b.url)}"><div style="display:flex;gap:8px;justify-content:flex-end"><button class="browser-menu-item" style="width:auto" id="bmCancel">Cancel</button><button class="browser-menu-item" style="width:auto;background:#8ab4f8;color:#202124" id="bmSave">Save</button></div></div>`);document.getElementById("bmCancel").onclick=showBookmarkManager;document.getElementById("bmSave").onclick=()=>{const title=document.getElementById("bmEditTitle").value.trim(),url=document.getElementById("bmEditUrl").value.trim();if(!url)return notify("Enter an address");b.title=title||url;b.url=url;saveBookmarks();showBookmarkManager();notify("Bookmark updated")}}
+function showBookmarkManager(){const rows=bookmarks.length?bookmarks.map((b,i)=>`<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px;align-items:center"><button class="browser-menu-item" onclick="openBookmark(${i})"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.title||b.url)}</span><small style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${esc(b.url)}</small></button><button class="toolbar-action" title="Edit" onclick="editBookmark(${i})">✎</button><button class="toolbar-action" title="Delete" onclick="deleteBookmark(${i})">×</button></div>`).join(""):'<p>No bookmarks yet. Use the star in the address bar to add one.</p>';showPopover(document.getElementById("browserMenuBtn"),`<h3>Bookmark manager</h3>${rows}<div class="browser-menu-sep"></div><button class="browser-menu-item" onclick="toggleBookmark();showBookmarkManager()">${bookmarks.some(b=>b.url===currentTab()?.url)?'Remove current bookmark':'Bookmark current tab'}</button>`)}
+document.getElementById("bookmarkBtn").onclick=toggleBookmark;
+document.getElementById("siteControlsBtn").onclick=e=>{const t=currentTab(),u=t?.url||"";let origin="New tab";try{origin=new URL(u).origin}catch{}showPopover(e.currentTarget,`<h3>Site controls</h3><p>${esc(origin)}</p><button class="browser-menu-item" onclick="reloadPage();closePopover()">Reload site</button><button class="browser-menu-item" onclick="navigator.clipboard?.writeText(currentTab()?.url||'');notify('Address copied');closePopover()">Copy address</button>`) };
+function filenameFrom(url,disp=""){const m=/filename\*?=(?:UTF-8''|["']?)([^"';]+)/i.exec(disp);if(m){try{return decodeURIComponent(m[1].replace(/["']/g,""))}catch{return m[1]}}try{return decodeURIComponent(new URL(url).pathname.split("/").pop())||"download"}catch{return "download"}}
+async function nextDownloadPath(name){name=(name||"download").replace(/[\\/:*?"<>|]+/g,"_");const r=await shellRPC("unlim8ted-browser-fs-list",{path:"/home/user/Downloads"}),items=r.items||r.entries||r.files||[],used=new Set(items.filter(x=>!x.dir&&x.type!=="directory").map(x=>x.name));if(!used.has(name))return "/home/user/Downloads/"+name;const dot=name.lastIndexOf("."),base=dot>0?name.slice(0,dot):name,ext=dot>0?name.slice(dot):"";for(let n=1;;n++){const x=`${base} (${n})${ext}`;if(!used.has(x))return "/home/user/Downloads/"+x}}
+function decodeGeckoJSON(out){for(let i=0;i<3&&typeof out==="string";i++){const t=out.trim();if(!t)return null;try{const v=JSON.parse(t);if(v===out)break;out=v}catch{break}}return out}
+async function geckoDownloadFetch(url){
+  const token="u8dl_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+  const launch=`(()=>{try{let w=window.content||document.commandDispatcher?.focusedWindow;if(!w)return 'NO_CONTENT';w.__u8Downloads=w.__u8Downloads||{};w.__u8Downloads[${JSON.stringify(token)}]={state:'loading'};(async()=>{try{let r=await w.fetch(${JSON.stringify(url)},{credentials:'include',redirect:'follow'});if(!r.ok)throw Error('HTTP '+r.status);let b=new Uint8Array(await r.arrayBuffer()),parts=[],step=24576;for(let i=0;i<b.length;i+=step){let x=b.subarray(i,i+step),str='';for(let j=0;j<x.length;j++)str+=String.fromCharCode(x[j]);parts.push(w.btoa(str))}w.__u8Downloads[${JSON.stringify(token)}]={state:'done',type:r.headers.get('content-type')||'application/octet-stream',disp:r.headers.get('content-disposition')||'',url:r.url||${JSON.stringify(url)},parts}}catch(e){w.__u8Downloads[${JSON.stringify(token)}]={state:'error',error:String(e&&e.message||e)}}})();return 'STARTED'}catch(e){return 'ERR:'+e}})()`;
+  const launched=decodeGeckoJSON(await gecko.evalChrome(launch));
+  if(String(launched).startsWith('ERR:')||launched==='NO_CONTENT')throw Error(String(launched));
+  const deadline=Date.now()+120000;
+  while(Date.now()<deadline){
+    await new Promise(r=>setTimeout(r,180));
+    let out=decodeGeckoJSON(await gecko.evalChrome(`(()=>{try{let w=window.content||document.commandDispatcher?.focusedWindow,o=w?.__u8Downloads?.[${JSON.stringify(token)}];if(!o||o.state==='loading')return '';if(w.__u8Downloads)delete w.__u8Downloads[${JSON.stringify(token)}];return JSON.stringify(o)}catch(e){return JSON.stringify({state:'error',error:String(e)})}})()`));
+    if(typeof out==='string'&&out.startsWith('{'))try{out=JSON.parse(out)}catch{}
+    if(!out||typeof out!=="object")continue;
+    if(out.state==='error')throw Error(out.error||'Download failed');
+    if(out.state==='done'){
+      let total=0,chunks=[];for(const part of out.parts||[]){const bin=atob(part),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);chunks.push(a);total+=a.length}
+      const bytes=new Uint8Array(total);let off=0;for(const a of chunks){bytes.set(a,off);off+=a.length}
+      return {bytes,mime:out.type||'application/octet-stream',disp:out.disp||'',finalUrl:out.url||url};
+    }
+  }
+  throw Error('Download timed out');
+}
+async function downloadToVFS(url,suggested=""){if(!url)throw Error("No download URL");await ensureGecko();notify("Downloading…");const r=await geckoDownloadFetch(url);const name=suggested||filenameFrom(r.finalUrl||url,r.disp),path=await nextDownloadPath(name);await shellRPC("unlim8ted-browser-fs-write",{path,bytes:Array.from(r.bytes),mime:r.mime});notify("Downloaded "+path.split("/").pop());return path}
+async function downloadCurrent(){const t=currentTab();if(!t||!/^https?:/i.test(t.url))return notify("Nothing downloadable on this tab");try{await downloadToVFS(t.url)}catch(e){notify("Download failed: "+e.message)}}
+async function showDownloads(){try{const r=await shellRPC("unlim8ted-browser-fs-list",{path:"/home/user/Downloads"}),files=(r.items||r.entries||r.files||[]).filter(f=>!f.dir&&f.type!=="directory");showPopover(document.getElementById("profileBtn"),`<h3>Downloads</h3>${files.length?files.map(f=>`<button class="browser-menu-item" onclick="openDownloaded('${String(f.path).replace(/'/g,"\\'")}')"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name||f.path)}</span></button>`).join(""):'<p>No downloads yet.</p>'}<div class="browser-menu-sep"></div><button class="browser-menu-item" onclick="downloadCurrent();closePopover()">Download current page</button>`)}catch(e){notify("Could not open Downloads: "+e.message)}}
+async function openDownloaded(path){closePopover();try{const r=await shellRPC("unlim8ted-browser-fs-read",{path}),bytes=new Uint8Array(r.bytes||[]),url=URL.createObjectURL(new Blob([bytes],{type:r.mime||"application/octet-stream"}));if(active<0)newTab();tabs[active].url=url;tabs[active].title=path.split("/").pop();tabs[active].hist.push(url);tabs[active].hi=tabs[active].hist.length-1;renderTabs();await loadUrl(url)}catch(e){notify(e.message)}}
+document.getElementById("profileBtn").onclick=()=>showDownloads();
+function looksDownloadableHref(href){try{const u=new URL(href);return /\.(?:zip|7z|rar|tar|gz|bz2|xz|pdf|exe|msi|dmg|pkg|deb|rpm|apk|iso|img|mp3|wav|ogg|flac|mp4|mkv|webm|avi|mov|csv|docx?|xlsx?|pptx?|epub|wasm)(?:$|[?#])/i.test(u.pathname+u.search)}catch{return false}}
+async function installDownloadBridge(){if(!geckoReady)return;try{await gecko.evalChrome(`(()=>{try{let w=window.content||document.commandDispatcher?.focusedWindow;if(!w||!w.document)return false;if(w.__u8DownloadBridgeDoc===w.document)return true;w.__u8DownloadBridgeDoc=w.document;const queue=(href,name='')=>{try{href=String(href||'');if(!href)return false;let explicit=!!name,common=/^(?:blob:|data:)/i.test(href)||/\.(?:zip|7z|rar|tar|gz|bz2|xz|pdf|exe|msi|dmg|pkg|deb|rpm|apk|iso|img|mp3|wav|ogg|flac|mp4|mkv|webm|avi|mov|csv|docx?|xlsx?|pptx?|epub|wasm)(?:$|[?#])/i.test(href);if(!explicit&&!common)return false;w.__u8PendingDownload={url:href,name:String(name||'')};return true}catch(e){return false}};w.document.addEventListener('click',e=>{let a=e.target?.closest?.('a[href]');if(!a)return;if(queue(a.href,a.getAttribute('download')||'')){e.preventDefault();e.stopImmediatePropagation()}},true);try{let proto=w.HTMLAnchorElement&&w.HTMLAnchorElement.prototype;if(proto&&!proto.__u8DownloadPatched){let nativeClick=proto.click;Object.defineProperty(proto,'__u8DownloadPatched',{value:true});proto.click=function(){if(queue(this.href,this.getAttribute('download')||''))return;return nativeClick.call(this)}}}catch(e){};try{if(!w.__u8OpenPatched){let nativeOpen=w.open;w.open=function(url,...args){if(queue(url,''))return null;return nativeOpen.call(this,url,...args)};w.__u8OpenPatched=true}}catch(e){};return true}catch(e){return false}})()`)}catch{}}
+async function pollDownloadBridge(){if(!geckoReady)return;try{let r=decodeGeckoJSON(await gecko.evalChrome(`(()=>{try{let w=window.content||document.commandDispatcher?.focusedWindow,p=w?.__u8PendingDownload;if(!p)return '';w.__u8PendingDownload=null;return JSON.stringify(p)}catch(e){return ''}})()`));if(typeof r==="string"&&r.startsWith("{"))try{r=JSON.parse(r)}catch{};if(r&&typeof r==="object"&&r.url)downloadToVFS(r.url,r.name).catch(e=>notify("Download failed: "+e.message))}catch{}}
+async function installExtension(){const path=await chooseVirtualFile("/home/user/Extensions");if(!path)return;try{const r=await shellRPC("unlim8ted-browser-fs-read",{path}),text=new TextDecoder().decode(new Uint8Array(r.bytes||[]));let ext;if(path.endsWith(".json")){ext=JSON.parse(text);if(!ext.code&&ext.script)ext.code=ext.script}else ext={name:path.split("/").pop(),matches:["<all_urls>"],code:text};if(!ext.code)throw Error("Extension needs a code or script field");ext.id=ext.id||("ext-"+Date.now());ext.enabled=ext.enabled!==false;extensions.push(ext);localStorage.setItem("u8-extensions",JSON.stringify(extensions));notify("Extension installed: "+(ext.name||ext.id));await runExtensions()}catch(e){notify("Extension install failed: "+e.message)}}
+function extMatches(ext,url){const m=ext.matches||["<all_urls>"];return m.some(x=>x==="<all_urls>"||x==="*://*/*"||(x.endsWith("*")&&url.startsWith(x.slice(0,-1)))||x===url)}
+async function runExtensions(){if(!geckoReady)return;const u=currentTab()?.url||"";for(const ext of extensions){if(!ext.enabled||!extMatches(ext,u))continue;try{await gecko.evalChrome(`(()=>{try{let w=document.commandDispatcher?.focusedWindow||window.content;return w.eval(${JSON.stringify(String(ext.code||""))})}catch(e){return String(e)}})()`)}catch(e){console.warn("extension",ext.name,e)}}}
+function showExtensions(){showPopover(document.getElementById("browserMenuBtn"),`<h3>Extensions</h3>${extensions.length?extensions.map((x,i)=>`<button class="browser-menu-item" onclick="toggleExtension(${i})">${x.enabled?'✓':'○'} ${esc(x.name||x.id)}</button>`).join(""):'<p>No extensions installed.</p>'}<div class="browser-menu-sep"></div><button class="browser-menu-item" onclick="closePopover();installExtension()">Load from files…</button>`)}
+function toggleExtension(i){extensions[i].enabled=!extensions[i].enabled;localStorage.setItem("u8-extensions",JSON.stringify(extensions));showExtensions()}
+function showBrowserMenu(){showPopover(document.getElementById("browserMenuBtn"),`<button class="browser-menu-item" onclick="newTab();closePopover()">New tab <small>Ctrl+T</small></button><button class="browser-menu-item" onclick="openVirtualFile().catch(e=>notify(e.message));closePopover()">Open file… <small>Ctrl+O</small></button><button class="browser-menu-item" onclick="saveCurrentToVirtualFS().then(()=>notify('Saved to Downloads')).catch(e=>notify(e.message));closePopover()">Save page… <small>Ctrl+S</small></button><div class="browser-menu-sep"></div><button class="browser-menu-item" onclick="showBookmarkManager()">Bookmark manager</button><button class="browser-menu-item" onclick="showExtensions()">Extensions</button><button class="browser-menu-item" onclick="showDownloads()">Downloads</button><div class="browser-menu-sep"></div><button class="browser-menu-item" onclick="toggleBookmark();closePopover()">${bookmarks.some(b=>b.url===currentTab()?.url)?'Remove bookmark':'Bookmark this tab'}</button>`)}
+document.getElementById("browserMenuBtn").onclick=showBrowserMenu;
+addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="t"){e.preventDefault();newTab()}if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==="d"){e.preventDefault();showDownloads()}if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==="o"){e.preventDefault();showBookmarkManager()}});
+// Hook successful page loads so enabled content scripts and download interception are reinstalled on each navigation.
+const _loadUrl=loadUrl;loadUrl=async function(u){await _loadUrl(u);syncBookmark();await installDownloadBridge();await runExtensions()};
+setInterval(()=>{installDownloadBridge();pollDownloadBridge()},700);
+window.Unlim8tedBrowser.download=downloadToVFS;window.Unlim8tedBrowser.downloads=()=>shellRPC("unlim8ted-browser-fs-list",{path:"/home/user/Downloads"});window.Unlim8tedBrowser.bookmarks={list:()=>bookmarks.slice(),manager:showBookmarkManager};window.Unlim8tedBrowser.extensions={list:()=>extensions.slice(),install:installExtension,run:runExtensions};
+
+if (!tabs.length) newTab();
+scheduleBrowserResize();
+</script>
+</body>
+</html>
+

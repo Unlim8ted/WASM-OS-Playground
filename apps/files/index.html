@@ -1,0 +1,223 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Files</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: Roboto, "Noto Sans", Arial, sans-serif;
+            --ink: #e8eaed;
+            --muted: #9aa0a6;
+            --surface: #202124;
+            --surface2: #292a2d;
+            --surface3: #303134;
+            --line: #3c4043;
+            --hover: #ffffff12
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--surface);
+            color: var(--ink);
+            font-size: 14px
+        }
+
+        button {
+            font: inherit;
+            color: inherit;
+            border: 0
+        }
+
+        .files-layout {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            height: 100%
+        }
+
+        .files-sidebar {
+            padding: 12px 8px;
+            background: var(--surface2);
+            border-right: 1px solid var(--line)
+        }
+
+        .files-side-title {
+            font-size: 12px;
+            color: var(--muted);
+            padding: 8px 15px
+        }
+
+        .sideitem {
+            height: 40px;
+            border-radius: 20px;
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer
+        }
+
+        .sideitem:hover {
+            background: var(--hover)
+        }
+
+        .sideitem.sel {
+            background: #8ab4f820;
+            color: #aecbfa
+        }
+
+        .filesmain {
+            display: flex;
+            flex-direction: column;
+            min-width: 0
+        }
+
+        .filetop {
+            height: 56px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--line);
+            gap: 8px
+        }
+
+        .path {
+            flex: 1;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .pill {
+            height: 34px;
+            padding: 0 14px;
+            border: 1px solid var(--line);
+            border-radius: 17px;
+            cursor: pointer;
+            background: var(--surface2)
+        }
+
+        .pill:hover {
+            background: var(--surface3)
+        }
+
+        .fileheader,
+        .frow {
+            display: grid;
+            grid-template-columns: minmax(260px, 1fr) 120px 180px;
+            align-items: center;
+            padding: 0 16px
+        }
+
+        .fileheader {
+            height: 38px;
+            color: var(--muted);
+            font-size: 12px;
+            border-bottom: 1px solid var(--line)
+        }
+
+        .filelist {
+            overflow: auto;
+            flex: 1
+        }
+
+        .frow {
+            height: 44px;
+            border-bottom: 1px solid #ffffff08
+        }
+
+        .frow:hover {
+            background: var(--hover)
+        }
+
+        .fname {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 0
+        }
+
+        .file-glyph {
+            width: 22px;
+            height: 22px;
+            display: grid;
+            place-items: center;
+            font-size: 18px
+        }
+
+        .filename {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .small {
+            font-size: 12px;
+            color: var(--muted)
+        }
+        .modalback{display:none;position:fixed;inset:0;background:#0008;place-items:center;z-index:20}
+        .modalback.show{display:grid}
+        .modal{width:min(380px,calc(100vw - 36px));background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:18px;box-shadow:0 18px 60px #0008}
+        .modal h2{margin:0 0 8px;font-size:18px}
+        .modal p{margin:0 0 12px;color:var(--muted)}
+        .modal input{width:100%;height:36px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);padding:0 10px}
+        .modalactions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+
+        @media(max-width:760px) {
+            .files-layout {
+                grid-template-columns: 185px 1fr
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="files-layout">
+        <aside class="files-sidebar">
+            <div class="files-side-title">My files</div>
+            <div class="sideitem sel" data-path="/home/user">⌂ <span>My files</span></div>
+            <div class="sideitem" data-path="/home/user/Downloads">⇩ <span>Downloads</span></div>
+            <div class="sideitem" data-path="/home/user/Documents">▤ <span>Documents</span></div>
+            <div class="sideitem" data-path="/home/user/Pictures">▧ <span>Images</span></div>
+            <div class="files-side-title">Apps</div>
+            <div class="sideitem" data-path="/Applications">◫ <span>Applications</span></div>
+            <div class="files-side-title">Linux</div>
+            <div class="sideitem" id="linuxFiles">›_ <span>Linux files</span></div>
+        </aside>
+        <section class="filesmain">
+            <div class="filetop"><span class="path" id="filepath">My files</span><button class="pill" id="newFolder">New
+                    folder</button><button class="pill" id="importBtn">Import</button><input hidden type="file"
+                    id="importFile"></div>
+            <div class="fileheader">
+                <div>Name</div>
+                <div>Size</div>
+                <div>Modified</div>
+            </div>
+            <div id="filelist" class="filelist"></div>
+        </section>
+    </div>
+    <div id="modalback" class="modalback"><div class="modal"><h2 id="modalTitle">New folder</h2><p id="modalText">Folder name</p><input id="modalInput" autocomplete="off" spellcheck="false"><div class="modalactions"><button class="pill" id="modalCancel">Cancel</button><button class="pill" id="modalOK">Create</button></div></div></div>
+    <script>
+        let currentPath = '/home/user', seq = 0, pending = new Map(); const enc = new TextEncoder();
+        function promptModal(title, text) { return new Promise(resolve => { modalTitle.textContent = title; modalText.textContent = text; modalInput.value = ''; modalback.classList.add('show'); modalOK.onclick = () => { modalback.classList.remove('show'); resolve(modalInput.value); }; modalCancel.onclick = () => { modalback.classList.remove('show'); resolve(''); }; requestAnimationFrame(() => modalInput.focus()); }) }
+        function rpc(type, data = {}) { return new Promise((resolve, reject) => { const id = ++seq; pending.set(id, { resolve, reject }); parent.postMessage({ type, id, ...data }, '*'); setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(Error('Request timed out')) } }, 15000) }) }
+        window.addEventListener('message', e => { const d = e.data || {}; if (d.type === 'unlim8ted-files-rpc-result' && pending.has(d.id)) { const p = pending.get(d.id); pending.delete(d.id); d.ok ? p.resolve(d) : p.reject(Error(d.error || 'Request failed')) } if (d.type === 'unlim8ted-files-refresh') showPath(currentPath) });
+        const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); function formatSize(n) { if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(1) + ' MB' }
+        async function showPath(path) { currentPath = path; filepath.textContent = path === '/home/user' ? 'My files' : path; document.querySelectorAll('.sideitem[data-path]').forEach(x => x.classList.toggle('sel', x.dataset.path === path)); try { const r = await rpc('unlim8ted-files-list', { path }); filelist.innerHTML = r.items.map(x => `<div class="frow" data-path="${esc(x.path)}" data-dir="${x.dir ? 1 : 0}"><div class="fname"><span class="file-glyph">${x.dir ? '📁' : '▤'}</span><span class="filename">${esc(x.name)}</span></div><div>${x.dir ? '—' : ''}</div><div></div></div>`).join('') || '<div class="small" style="padding:30px">This folder is empty.</div>'; document.querySelectorAll('.frow').forEach(row => row.ondblclick = () => openRow(row)) } catch (e) { filelist.innerHTML = '<div class="small" style="padding:30px">' + esc(e.message) + '</div>' } }
+        async function openRow(row) { if (row.dataset.dir === '1') return showPath(row.dataset.path); const r = await rpc('unlim8ted-files-read', { path: row.dataset.path }); const u = URL.createObjectURL(new Blob([new Uint8Array(r.bytes)])); const a = document.createElement('a'); a.href = u; a.download = row.dataset.path.split('/').pop(); a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000) }
+        document.querySelectorAll('.sideitem[data-path]').forEach(x => x.onclick = () => showPath(x.dataset.path)); linuxFiles.onclick = () => rpc('unlim8ted-files-open-terminal'); newFolder.onclick = async () => { const n = await promptModal('New folder', 'Folder name'); if (n) { await rpc('unlim8ted-files-mkdir', { path: currentPath + '/' + n }); showPath(currentPath) } }; importBtn.onclick = () => importFile.click(); importFile.onchange = async e => { const f = e.target.files[0]; if (f) { await rpc('unlim8ted-files-write', { path: currentPath + '/' + f.name, bytes: Array.from(new Uint8Array(await f.arrayBuffer())) }); showPath(currentPath); e.target.value = '' } }; showPath(currentPath);
+    </script>
+</body>
+
+</html>

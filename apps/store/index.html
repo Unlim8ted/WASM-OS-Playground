@@ -1,0 +1,812 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>App Store</title>
+
+<style>
+:root{
+  --ink:#e8eaed;
+  --muted:#9aa0a6;
+  --surface:#202124;
+  --surface2:#292a2d;
+  --line:#3c4043;
+  color-scheme:dark;
+  font-family:Roboto,"Noto Sans",Arial,sans-serif
+}
+
+*{
+  box-sizing:border-box
+}
+
+html,
+body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:var(--surface);
+  color:var(--ink);
+  font-size:14px
+}
+
+button{
+  font:inherit;
+  color:inherit;
+  border:0
+}
+
+.app-body{
+  flex:1;
+  min-height:0;
+  position:relative;
+  background:var(--surface)
+}
+
+.storebody{
+  height:100%;
+  overflow:auto;
+  padding:22px 24px 28px
+}
+
+.storehero{
+  height:142px;
+  border-radius:18px;
+  background:linear-gradient(120deg,#174ea6,#6c3baa);
+  padding:26px;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  justify-content:center
+}
+
+.storehero h2{
+  font-size:28px;
+  margin:0 0 8px
+}
+
+.storehero p{
+  margin:0;
+  opacity:.8
+}
+
+.storegrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(235px,1fr));
+  gap:12px;
+  margin-top:20px
+}
+
+.appcard{
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:18px;
+  background:var(--surface2);
+  min-height:172px;
+  display:flex;
+  flex-direction:column
+}
+
+.appcard-top{
+  display:flex;
+  gap:13px;
+  align-items:center
+}
+
+.appcard h3{
+  margin:0;
+  font-size:16px
+}
+
+.small{
+  font-size:12px;
+  color:var(--muted)
+}
+
+.appcard .small{
+  margin-top:11px;
+  line-height:1.5;
+  flex:1
+}
+
+.app-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin-top:16px
+}
+
+.install{
+  height:34px;
+  padding:0 18px;
+  border-radius:17px;
+  background:#8ab4f8;
+  color:#10284f;
+  font-weight:600;
+  cursor:pointer
+}
+
+.install.secondary{
+  background:transparent;
+  border:1px solid var(--line);
+  color:var(--ink)
+}
+
+.install:disabled{
+  opacity:.58;
+  cursor:default
+}
+
+.download-note{
+  font-size:11px;
+  color:var(--muted);
+  margin-top:7px
+}
+
+.app-icon{
+  width:34px;
+  height:34px;
+  position:relative;
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  border-radius:9px;
+  overflow:hidden
+}
+
+.app-icon svg{
+  width:100%;
+  height:100%;
+  display:block
+}
+
+.modal-backdrop{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(0,0,0,.58);
+  z-index:20
+}
+
+.modal-backdrop.open{
+  display:flex
+}
+
+.modal{
+  width:min(420px,100%);
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#202124;
+  box-shadow:0 18px 48px rgba(0,0,0,.45);
+  overflow:hidden
+}
+
+.modal-head{
+  padding:15px 16px 8px;
+  font-weight:700
+}
+
+.modal-body{
+  padding:0 16px 16px;
+  color:var(--muted);
+  line-height:1.45;
+  white-space:pre-wrap
+}
+
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  padding:10px 12px;
+  border-top:1px solid var(--line)
+}
+
+.modal-actions button{
+  height:32px;
+  border-radius:16px;
+  padding:0 16px;
+  background:#8ab4f8;
+  color:#10284f;
+  font-weight:600;
+  cursor:pointer
+}
+</style>
+</head>
+
+<body>
+
+<main class="app-body storebody">
+  <div class="storehero">
+    <h2>Apps for Unlim8ted</h2>
+    <p>Install apps into /Applications.</p>
+  </div>
+
+  <div id="storegrid" class="storegrid"></div>
+</main>
+
+<div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div id="modalTitle" class="modal-head"></div>
+    <div id="modalBody" class="modal-body"></div>
+    <div class="modal-actions">
+      <button id="modalClose" type="button">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="/catalog-data.js"></script>
+
+<script>
+/*
+ * System apps are always installed and cannot be removed.
+ * Their app information/icons still come from catalog-data.js.
+ */
+const SYSTEM_APPS = new Set([
+  "browser",
+  "files",
+  "store",
+  "terminal",
+  "settings"
+]);
+
+
+/* =========================
+   FILESYSTEM DATABASE
+   ========================= */
+
+const DB = {
+  db: null,
+
+  async init() {
+    this.db = await new Promise((res, rej) => {
+      let r = indexedDB.open("unlim8ted-os", 1);
+
+      r.onupgradeneeded = () => {
+        if (!r.result.objectStoreNames.contains("fs")) {
+          r.result.createObjectStore("fs", {
+            keyPath: "path"
+          });
+        }
+      };
+
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  },
+
+  tx(mode = "readonly") {
+    return this.db
+      .transaction("fs", mode)
+      .objectStore("fs");
+  },
+
+  get(path) {
+    return new Promise(resolve => {
+      let q = this.tx().get(path);
+
+      q.onsuccess = () => {
+        resolve(q.result || null);
+      };
+
+      q.onerror = () => {
+        resolve(null);
+      };
+    });
+  },
+
+  put(path, data, mtime = Date.now()) {
+    return new Promise((resolve, reject) => {
+      let q = this.tx("readwrite").put({
+        path,
+        data: Array.from(data),
+        mtime
+      });
+
+      q.onsuccess = () => resolve();
+      q.onerror = () => reject(q.error);
+    });
+  },
+
+  del(path) {
+    return new Promise(resolve => {
+      let q = this.tx("readwrite").delete(path);
+      q.onsuccess = () => resolve();
+      q.onerror = () => resolve();
+    });
+  },
+
+  all() {
+    return new Promise(resolve => {
+      let q = this.tx().getAll();
+
+      q.onsuccess = () => {
+        resolve(q.result || []);
+      };
+
+      q.onerror = () => {
+        resolve([]);
+      };
+    });
+  }
+};
+
+
+/* =========================
+   ICONS
+   ========================= */
+
+/*
+ * All icons come directly from catalog-data.js.
+ * There is no built-in system icon list here.
+ */
+const iconHtml = app => `
+  <span class="app-icon" aria-hidden="true">
+    ${app.svg || ""}
+  </span>
+`;
+
+
+/* =========================
+   SYSTEM LINUX VM BRIDGE
+   ========================= */
+
+const pendingVmRequests = new Map();
+const modalBackdrop = document.getElementById("modalBackdrop");
+const modalTitle = document.getElementById("modalTitle");
+const modalBody = document.getElementById("modalBody");
+const modalClose = document.getElementById("modalClose");
+
+function showModal(title, message) {
+  modalTitle.textContent = title;
+  modalBody.textContent = message;
+  modalBackdrop.classList.add("open");
+  modalClose.focus();
+}
+
+function closeModal() {
+  modalBackdrop.classList.remove("open");
+}
+
+modalClose.addEventListener("click", closeModal);
+modalBackdrop.addEventListener("click", event => {
+  if (event.target === modalBackdrop) closeModal();
+});
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape") closeModal();
+});
+
+window.addEventListener("message", event => {
+  const data = event.data || {};
+  const pending = pendingVmRequests.get(data.requestId);
+  if (!pending) return;
+
+  if (data.type === pending.resultType) {
+    clearTimeout(pending.timer);
+    pendingVmRequests.delete(data.requestId);
+    data.ok ? pending.resolve(data) : pending.reject(new Error(data.error || "Linux VM request failed"));
+  }
+});
+
+function requestLinuxVm(type, payload = {}, timeout = 300000) {
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const resultType = `${type}-result`;
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingVmRequests.delete(requestId);
+      reject(new Error("Linux VM request timed out"));
+    }, timeout);
+
+    pendingVmRequests.set(requestId, { resolve, reject, timer, resultType });
+    parent.postMessage({ type, requestId, ...payload }, "*");
+  });
+}
+
+async function installPythonIntoLinux(button) {
+  button.textContent = "Installing Python…";
+  return requestLinuxVm("unlim8ted-python-install", {}, 20 * 60 * 1000);
+}
+
+async function uninstallPythonFromLinux() {
+  return requestLinuxVm("unlim8ted-python-uninstall", {}, 180000);
+}
+
+
+/* =========================
+   STORE
+   ========================= */
+
+async function renderStore() {
+  const grid = document.getElementById("storegrid");
+
+  if (typeof catalog === "undefined") {
+    grid.innerHTML = `
+      <div class="small">
+        catalog-data.js is required.
+      </div>
+    `;
+    return;
+  }
+
+  const cards = [];
+
+  for (const app of catalog) {
+    const isSystem = SYSTEM_APPS.has(app.id);
+
+    /*
+     * System apps are considered installed regardless
+     * of whether they exist in /Applications.
+     */
+    const installed =
+      isSystem ||
+      !!(await DB.get(
+        `/Applications/${app.id}.app/index.html`
+      ));
+
+    let action = "";
+
+    if (isSystem) {
+      /*
+       * System apps cannot be downloaded or removed.
+       */
+      action = `
+        <button
+          class="install secondary"
+          disabled
+          title="System apps cannot be removed"
+        >
+          Installed
+        </button>
+      `;
+    } else if (installed) {
+      action = `
+        <button
+          class="install secondary"
+          onclick="removeApp('${app.id}')"
+        >
+          Remove
+        </button>
+      `;
+    } else {
+      action = `
+        <button
+          class="install"
+          onclick="installApp('${app.id}',this)"
+        >
+          Download
+        </button>
+      `;
+    }
+
+    /*
+     * Don't show download size for built-in system apps.
+     */
+    const downloadInfo =
+      app.downloadSize && !isSystem
+        ? `
+          <div class="download-note">
+            Download ${app.downloadSize}
+          </div>
+        `
+        : "";
+
+    cards.push(`
+      <div class="appcard">
+
+        <div class="appcard-top">
+          ${iconHtml(app)}
+          <h3>${app.name}</h3>
+        </div>
+
+        <div class="small">
+          ${app.desc || ""}
+        </div>
+
+        ${downloadInfo}
+
+        <div class="app-actions">
+          ${action}
+        </div>
+
+      </div>
+    `);
+  }
+
+  grid.innerHTML = cards.join("");
+}
+
+
+/* =========================
+   DOWNLOAD APP
+   ========================= */
+
+async function fetchApp(app, button) {
+  /*
+   * Local app.
+   */
+  if (app.localPath) {
+    const url = new URL(
+      app.localPath,
+      new URL("../../", location.href)
+    );
+
+    const response = await fetch(url, {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw Error(`HTTP ${response.status}`);
+    }
+
+    return new Uint8Array(
+      await response.arrayBuffer()
+    );
+  }
+
+  /*
+   * Remote app.
+   */
+  let lastError;
+
+  for (const url of app.remoteUrls || []) {
+    try {
+      button.textContent = "Downloading…";
+
+      const response = await fetch(url, {
+        mode: "cors",
+        credentials: "omit",
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        throw Error(`HTTP ${response.status}`);
+      }
+
+      return new Uint8Array(
+        await response.arrayBuffer()
+      );
+
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || Error("No installer URL");
+}
+
+
+/* =========================
+   INSTALL APP
+   ========================= */
+
+async function installApp(id, button) {
+  /*
+   * Extra protection:
+   * system apps cannot be installed/replaced
+   * through the store.
+   */
+  if (SYSTEM_APPS.has(id)) {
+    return;
+  }
+
+  const app = catalog.find(
+    item => item.id === id
+  );
+
+  if (!app) {
+    return;
+  }
+
+  const oldText = button.textContent;
+
+  try {
+    button.disabled = true;
+
+    /* Python is a real Linux VM package as well as a launcher app. */
+    if (id === "python") {
+      await installPythonIntoLinux(button);
+      button.textContent = "Installing app…";
+    }
+
+    const bytes = await fetchApp(
+      app,
+      button
+    );
+
+    const manifest = new TextEncoder().encode(
+      JSON.stringify(app)
+    );
+
+    await DB.put(
+      `/Applications/${id}.app/manifest.json`,
+      manifest
+    );
+
+    await DB.put(
+      `/Applications/${id}.app/index.html`,
+      bytes
+    );
+
+    parent.postMessage(
+      {
+        type: "unlim8ted-apps-changed"
+      },
+      "*"
+    );
+
+    await renderStore();
+
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = oldText;
+
+    showModal(
+      `Could not install ${app.name}`,
+      error.message || String(error)
+    );
+  }
+}
+
+
+/* =========================
+   REMOVE APP
+   ========================= */
+
+async function removeApp(id) {
+  /*
+   * Hard block system-app removal.
+   *
+   * This protects them even if removeApp()
+   * is manually called from JavaScript.
+   */
+  if (SYSTEM_APPS.has(id)) {
+    return;
+  }
+
+  if (id === "python") {
+    try {
+      await uninstallPythonFromLinux();
+    } catch (error) {
+      showModal(
+        "Could not remove Python",
+        error.message || String(error)
+      );
+      return;
+    }
+  }
+
+  const files = await DB.all();
+
+  for (const file of files) {
+    if (
+      file.path.startsWith(
+        `/Applications/${id}.app/`
+      )
+    ) {
+      await DB.del(file.path);
+    }
+  }
+
+  parent.postMessage(
+    {
+      type: "unlim8ted-apps-changed"
+    },
+    "*"
+  );
+
+  await renderStore();
+}
+
+async function handlePythonStoreMessage(e) {
+  if (!e.data || !e.data.type) return;
+
+  // Only allow the Store iframe to request Python installation.
+  const storeFrame = document.getElementById("storeFrame");
+  if (storeFrame && e.source !== storeFrame.contentWindow) return;
+
+  // INSTALL PYTHON INTO LINUX VM
+  if (e.data.type === "unlim8ted-python-install") {
+    const requestId = e.data.requestId;
+
+    try {
+      const pythonPath = await ensurePythonRuntime(e.source);
+
+      // Make python/python3 available as normal Linux commands.
+      await linuxExec(`
+        mkdir -p /usr/local/bin
+
+        cat > /usr/local/bin/python3 <<'EOF'
+#!/bin/sh
+exec "${pythonPath}" "$@"
+EOF
+
+        chmod +x /usr/local/bin/python3
+        ln -sf /usr/local/bin/python3 /usr/local/bin/python
+
+        python3 --version
+      `, 30000);
+
+      e.source?.postMessage({
+        type: "unlim8ted-python-install-result",
+        requestId,
+        ok: true,
+        path: pythonPath
+      }, "*");
+
+    } catch (error) {
+      console.error("Python VM install failed:", error);
+
+      e.source?.postMessage({
+        type: "unlim8ted-python-install-result",
+        requestId,
+        ok: false,
+        error: error?.message || String(error)
+      }, "*");
+    }
+
+    return;
+  }
+
+  // CHECK WHETHER PYTHON IS INSTALLED
+  if (e.data.type === "unlim8ted-python-check") {
+    const requestId = e.data.requestId;
+
+    try {
+      await bootLinux();
+      await waitLinuxReady();
+
+      const result = await linuxExec(`
+        p=$(
+          command -v python3 2>/dev/null ||
+          command -v python 2>/dev/null ||
+          find /mnt/unlim8ted/home/user/.runtime/python \
+            -type f -path '*/bin/python' 2>/dev/null |
+          head -1
+        )
+
+        if [ -n "$p" ]; then
+          echo "INSTALLED:$p"
+        else
+          echo "NOT_INSTALLED"
+        fi
+      `);
+
+      const match = result.output.match(/INSTALLED:(\/[^\r\n]+)/);
+
+      e.source?.postMessage({
+        type: "unlim8ted-python-check-result",
+        requestId,
+        installed: !!match,
+        path: match ? match[1].trim() : ""
+      }, "*");
+
+    } catch (error) {
+      e.source?.postMessage({
+        type: "unlim8ted-python-check-result",
+        requestId,
+        installed: false,
+        error: error?.message || String(error)
+      }, "*");
+    }
+  }
+}
+/* =========================
+   START
+   ========================= */
+
+DB.init()
+  .then(renderStore)
+  .catch(error => {
+    document.getElementById("storegrid").innerHTML = `
+      <div class="small">
+        ${error.message || error}
+      </div>
+    `;
+  });
+</script>
+
+</body>
+</html>
