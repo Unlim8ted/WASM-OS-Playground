@@ -1,4 +1,4 @@
-# WASM OS Playground
+# [WASM OS Playground](http://os.unlim8ted.com/)
 
 An experimental browser-based operating system playground built with WebAssembly, Gecko, v86 Linux, a persistent virtual filesystem, and installable HTML/WASM applications.
 
